@@ -1,0 +1,18 @@
+<launch>
+    <arg name="camera_info_file" default="iphone_camera_info.yaml" />
+    <arg name="image_folder" default="images/surgical_tools/" />
+    <arg name="image_ext" default="png" />
+    <arg name="frame_id" default="/camera" />
+    <arg name="publish_rate" default="10" />
+
+	<node name="image_publisher" pkg="pose_labeler" type="image_publisher.py" ns="image_folder" output="log">
+        <param name="camera_info_file" value="$(arg camera_info_file)" />
+        <param name="image_folder" value="$(arg image_folder)" />
+        <param name="image_ext" value="$(arg image_ext)" />
+        <param name="frame_id" value="$(arg frame_id)" />
+        <param name="publish_rate" value="$(arg publish_rate)" />
+        <remap from="out_image" to="/image_folder/image" />
+        <remap from="out_camera_info" to="/image_folder/camera_info" />
+    </node>
+
+</launch>
