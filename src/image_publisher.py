@@ -25,8 +25,8 @@ def parseCameraInfoYaml(filename):
     return camera_info
 
 def resizeCameraInfo(camera_info, new_size):
-    y_scale = new_size[0]/camera_info.height
-    x_scale = new_size[1]/camera_info.width
+    y_scale = float(new_size[0])/camera_info.height
+    x_scale = float(new_size[1])/camera_info.width
     camera_info.height = new_size[0]
     camera_info.width = new_size[1]
     # Camera Matrix
