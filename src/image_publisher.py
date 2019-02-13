@@ -57,6 +57,7 @@ def main():
 
     image_filenames = sorted(glob.glob(os.path.join(image_folder, '*.'+image_ext)))
     num_images = len(image_filenames)
+    rospy.loginfo('Total number of images in folder: {}'.format(num_images))
     rate = rospy.Rate(publish_rate)
     first_loop = True
     while(loop or first_loop):

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pose_labeler)
+project(object_pose_utils)
 
 find_package(catkin REQUIRED
     COMPONENTS 
@@ -29,4 +29,6 @@ catkin_package(
     cv_bridge
     tf2_geometry_msgs
   )
+
+#add_dependencies(pose_labelere ${PROJECT_NAME}_gencfg)
 

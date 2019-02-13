@@ -1,5 +1,5 @@
 <package>
-  <name>pose_labeler</name>
+  <name>object_pose_utils</name>
   <version>0.0.1</version>
   <description>
     Ground truths image datasets with object poses

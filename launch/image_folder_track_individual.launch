@@ -1,0 +1,38 @@
+<launch>
+    <arg name="image_folder"/>
+    <arg name="camera_info_file" default="$(find object_pose_utils)/camera_info/iphone_camera_info.yaml" />
+    <arg name="image_ext" default="png" />
+    <arg name="frame_id" default="/camera" />
+    <arg name="publish_rate" default="5" />
+    <arg name="loop" default="False" />
+
+
+    <arg name="marker_size" default="6.0" />
+	<arg name="max_new_marker_error" default="0.2" />
+	<arg name="max_track_error" default="0.2" />
+	<arg name="cam_image_topic" default="/image_folder/image" />
+	<arg name="cam_info_topic" default="/image_folder/camera_info" />
+	<arg name="output_frame" default="/camera" />
+	<arg name="bundle_files" default="$(find object_pose_utils)/bundles/training_all_mat.xml" />
+
+    <arg name="rviz" default="False" />
+
+    <include file="$(find object_pose_utils)/launch/play_image_folder.launch">
+        <arg name="camera_info_file" value="$(arg camera_info_file)" />
+        <arg name="image_folder" value="$(arg image_folder)" />
+        <arg name="image_ext" value="$(arg image_ext)" />
+        <arg name="frame_id" value="$(arg frame_id)" />
+        <arg name="publish_rate" value="$(arg publish_rate)" />
+        <arg name="loop" value="$(arg loop)" />
+    </include>
+    <include file="$(find object_pose_utils)/launch/ar_track_individual.launch">
+	    <arg name="marker_size" value="$(arg marker_size)" />
+        <arg name="max_new_marker_error" value="$(arg max_new_marker_error)" />
+        <arg name="max_track_error" value="$(arg max_track_error)" />
+        <arg name="output_frame" value="$(arg output_frame)" />
+    </include>   
+    <arg name="arg_name" default="desired_value"/>
+
+    <node pkg="rviz" type="rviz" name="rviz" output="log" if="$(eval rviz)"/>
+    
+</launch>
