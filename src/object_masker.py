@@ -12,6 +12,7 @@ from multiprocessing import Lock
 
 import tf2_ros
 from tf2_geometry_msgs import PointStamped
+import tf
 
 from sensor_msgs.msg import Image, CameraInfo
 import image_geometry
@@ -60,6 +61,15 @@ def segmentImage(image):
     #image_thr = cv2.morphologyEx(image_thr, cv2.MORPH_CLOSE, kernel, iterations = 1)
     _, markers = cv2.connectedComponents(image_thr)
     return markers
+
+def closeSegments(img_seg, idxs):
+    kernel = np.ones((31,31), np.uint8)
+
+    for idx in idxs:
+        mask = (img_seg == idx).astype(np.uint8);
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations = 1)
+        img_seg[mask] = idx
+    return img_seg
 
 def getCMapImage(image, cmap='gray'):
     img_cmap = plt.imshow(image, cmap=cmap)._rgba_cache
@@ -129,19 +139,19 @@ class ObjectMasker(object):
     def imageCallback(self, img_msg, info_msg):
         try:
             img = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-            trans_marker = self.tf_buffer.lookup_transform(img_msg.header.frame_id[1:],
-                                                           self.frame_id, 
-                                                           img_msg.header.stamp,
-                                                           rospy.Duration(0.01))
-            self.board_trans = np.array([trans_marker.transform.translation.x,
-                                         trans_marker.transform.translation.y,
-                                         trans_marker.transform.translation.z])
-            self.board_rot = np.array([trans_marker.transform.rotation.x,
-                                       trans_marker.transform.rotation.y,
-                                       trans_marker.transform.rotation.z,
-                                       trans_marker.transform.rotation.w])
-            self.board_mat = quaternion_matrix(self.board_rot)
-            self.board_mat[:3, 3] = self.board_trans
+            #trans_marker = self.tf_buffer.lookup_transform(img_msg.header.frame_id[1:],
+            #                                               self.frame_id, 
+            #                                               img_msg.header.stamp,
+            #                                               rospy.Duration(0.01))
+            #self.board_trans = np.array([trans_marker.transform.translation.x,
+            #                             trans_marker.transform.translation.y,
+            #                             trans_marker.transform.translation.z])
+            #self.board_rot = np.array([trans_marker.transform.rotation.x,
+            #                           trans_marker.transform.rotation.y,
+            #                           trans_marker.transform.rotation.z,
+            #                           trans_marker.transform.rotation.w])
+            #self.board_mat = quaternion_matrix(self.board_rot)
+            #self.board_mat[:3, 3] = self.board_trans
             header = img_msg.header
         except CvBridgeError as err:
             rospy.logerr(err)
@@ -152,6 +162,7 @@ class ObjectMasker(object):
         frame_id = header.frame_id
         if(frame_id[0] == '/'):
             frame_id = frame_id[1:]
+        
         try:
             for pt in self.board_corners:
                 pt.header.stamp = header.stamp
@@ -159,10 +170,13 @@ class ObjectMasker(object):
                     pt.header.stamp, rospy.Duration(0.1))):
                     corner = self.tf_buffer.transform(pt, frame_id, rospy.Duration(0.5))
                     trans_corners.append(np.array([corner.point.x, corner.point.y, corner.point.z]))
+                else:
+                    rospy.logwarn('TF not availble')
+                    return
         except tf2_ros.ExtrapolationException as err:
-            rospy.logwarn(type(err))
             rospy.logwarn(err)
             return
+        
         pixel_corners = []
         for j, pt in enumerate(trans_corners):
             pixel_pt = np.array(self.model.project3dToPixel(pt)).astype(int) 
@@ -182,10 +196,15 @@ class ObjectMasker(object):
         markers = np.zeros_like(all_markers)
         dists = []
         for idx in filtered_idxs:
-            M = cv2.moments((all_markers == idx).astype(np.uint8)) 
-            x_c = M["m10"] / M["m00"]
-            y_c = M["m01"] / M["m00"]
-            dists.append(np.linalg.norm(pixel_corners[0,:]-np.array([y_c,x_c])))
+            if(np.sum(all_markers == idx) > 0):
+                M = cv2.moments((all_markers == idx).astype(np.uint8)) 
+                x_c = M["m10"] / M["m00"]
+                y_c = M["m01"] / M["m00"]
+                dists.append(np.linalg.norm(pixel_corners[0,:]-np.array([y_c,x_c])))
+            else:
+                rospy.logwarn('Mask has zero points')
+                dists.append(np.inf)
+                continue
 
         d_idxs = np.argsort(dists)
         
@@ -194,6 +213,8 @@ class ObjectMasker(object):
             markers[all_markers == (filtered_idxs[idx])] = j+1
             #rospy.loginfo(np.sum(markers_masked == idx))
             #markers[markers_masked == idx] = j
+        
+        #markers = closeSegments(markers, np.arange(len(d_idxs)))
 
         display_img = cv2.applyColorMap(markers.astype(np.uint8)*85, cv2.COLORMAP_JET) 
         #display_img = cv2.applyColorMap(markers_masked.astype(np.uint8), cv2.COLORMAP_JET) 
