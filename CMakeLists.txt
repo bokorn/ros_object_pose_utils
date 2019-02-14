@@ -11,6 +11,7 @@ find_package(catkin REQUIRED
     message_filters
     tf2_ros
     cv_bridge
+    ar_track_alvar_msgs
     tf2_geometry_msgs
   )
 
@@ -27,6 +28,7 @@ catkin_package(
     image_geometry
     tf2_ros
     cv_bridge
+    ar_track_alvar_msgs
     tf2_geometry_msgs
   )
 

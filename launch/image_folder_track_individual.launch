@@ -13,7 +13,8 @@
 	<arg name="cam_image_topic" default="/image_folder/image" />
 	<arg name="cam_info_topic" default="/image_folder/camera_info" />
 	<arg name="output_frame" default="/camera" />
-	<arg name="bundle_files" default="$(find object_pose_utils)/bundles/training_all_mat.xml" />
+	<arg name="bundle_frame" default="/marker_bundle" />
+	<arg name="bundle_file" default="$(find object_pose_utils)/bundles/training_all_mat.xml" />
 
     <arg name="rviz" default="False" />
 
@@ -31,7 +32,12 @@
         <arg name="max_track_error" value="$(arg max_track_error)" />
         <arg name="output_frame" value="$(arg output_frame)" />
     </include>   
-    <arg name="arg_name" default="desired_value"/>
+    <node name="ar_ransac" pkg="object_pose_utils" type="ar_ransac.py" respawn="false" output="screen">
+        <param name="bundle_file" type="string" value="$(arg bundle_file)" />
+        <param name="output_frame" type="string" value="$(arg bundle_frame)" />
+            
+        <remap from="in_markers"  to="/ar_pose_marker" />
+    </node>
 
     <node pkg="rviz" type="rviz" name="rviz" output="log" if="$(eval rviz)"/>
     
