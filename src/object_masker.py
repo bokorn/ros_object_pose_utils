@@ -19,7 +19,8 @@ import image_geometry
 import message_filters
 
 from tf.transformations import quaternion_matrix
-
+import xml.etree.ElementTree as ET
+import open3d
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
@@ -75,18 +76,41 @@ def getCMapImage(image, cmap='gray'):
     img_cmap = plt.imshow(image, cmap=cmap)._rgba_cache
     return img_cmap
 
+def parseConfigXml(filename):
+    tree = ET.parse(filename)
+    root = tree.getroot()
+    obj_filenames = {}
+    pcd_filenames = {}
+    poses = {}
+    for obj in root:
+        obj_filenames[obj.get('name')] = obj.find('obj_file').text
+        pcd_filenames[obj.get('name')] = obj.find('pcd_file').text
+        t = np.fromstring(obj.find('translation').text, sep=',')
+        q = np.fromstring(obj.find('orientation').text, sep=',')
+        trans_mat = tf.transformations.quaternion_matrix(q)
+        trans_mat[:3,3] = t
+        poses[obj.get('name')] = trans_mat
+    return poses, pcd_filenames, obj_filenames
+
 class ObjectMasker(object):
     def __init__(self, obj_filename = '/home/bokorn/data/surgical/models/scalpel.obj',# scissor.obj',
                  ):
         rospy.init_node("object_masker")    
-
+        
+        config_filename = rospy.get_param('~config_file')
+        self.obj_poses, self.pcd_filenames, _ = parseConfigXml(config_filename)
+        self.obj_pts = {}
+        for obj in self.obj_poses.keys():
+            pcd = open3d.read_point_cloud(self.pcd_filenames[obj])
+            pcd.transform(self.obj_poses[obj])
+            self.obj_pts[obj] = np.vstack([np.asarray(pcd.points).T, np.ones([1,len(pcd.points)])])
         #paramlist=rosparam.load_file("/path/to/myfile",default_namespace="my_namespace")
         #for params, ns in paramlist:
         #    rosparam.upload_params(ns,params)
         
         self.model = image_geometry.PinholeCameraModel()
 
-        self.frame_id = rospy.get_param('~board_frame', 'ar_marker_0')
+        self.frame_id = rospy.get_param('~board_frame', 'marker_bundle')
         self.info_mutex = Lock()
          
         ll_corner = PointStamped()
@@ -126,43 +150,54 @@ class ObjectMasker(object):
 
         self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
         self.ts.registerCallback(self.imageCallback)
-        
-        #self.rot = quaternion_from_euler(config['angle_x']*np.pi/180,
-        #                                 config['angle_y']*np.pi/180,
-        #                                 config['angle_z']*np.pi/180,
-        #                                 axes='rxyz')
-        #self.trans = np.array([config['trans_x'], config['trans_y'], config['trans_z']])
-        #self.trans_mat = quaternion_matrix(self.rot)
-        #self.trans_mat[:3, 3] = self.trans
-
+       
 
     def imageCallback(self, img_msg, info_msg):
         try:
             img = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-            #trans_marker = self.tf_buffer.lookup_transform(img_msg.header.frame_id[1:],
-            #                                               self.frame_id, 
-            #                                               img_msg.header.stamp,
-            #                                               rospy.Duration(0.01))
-            #self.board_trans = np.array([trans_marker.transform.translation.x,
-            #                             trans_marker.transform.translation.y,
-            #                             trans_marker.transform.translation.z])
-            #self.board_rot = np.array([trans_marker.transform.rotation.x,
-            #                           trans_marker.transform.rotation.y,
-            #                           trans_marker.transform.rotation.z,
-            #                           trans_marker.transform.rotation.w])
-            #self.board_mat = quaternion_matrix(self.board_rot)
-            #self.board_mat[:3, 3] = self.board_trans
             header = img_msg.header
         except CvBridgeError as err:
             rospy.logerr(err)
             return
        
         self.model.fromCameraInfo(info_msg)
+
         trans_corners = []
         frame_id = header.frame_id
         if(frame_id[0] == '/'):
             frame_id = frame_id[1:]
         
+        proj_img = np.zeros(img.shape[:2])
+
+        try:
+            if(self.tf_buffer.can_transform(frame_id, self.frame_id, header.stamp, rospy.Duration(0.1))):
+                trans = self.tf_buffer.lookup_transform(frame_id, self.frame_id, header.stamp, rospy.Duration(0.1))
+                trans_mat = tf.transformations.quaternion_matrix([trans.transform.rotation.x,
+                                                                  trans.transform.rotation.y,
+                                                                  trans.transform.rotation.z,
+                                                                  trans.transform.rotation.w])
+                trans_mat[:3,3] = [trans.transform.translation.x,
+                                   trans.transform.translation.y,
+                                   trans.transform.translation.z]
+                
+                K = np.array([[self.model.fx(),0,self.model.Tx(),0],
+                              [0,self.model.fy(),self.model.Ty(),0],
+                              [0,0,1,0]])
+                P = K.dot(trans_mat)
+                c_img = np.array([[self.model.cx(),self.model.cy(),0]]).T
+                for idx, pts in enumerate(self.obj_pts.values()):
+                    pts_img = P.dot(pts)
+                    pts_img = pts_img/pts_img[2,:] + c_img
+                    u = pts_img[0,:]
+                    v = pts_img[1,:]
+                    mask = np.logical_and.reduce((u >= 0, u < img.shape[1], v >= 0, v < img.shape[0]))
+                    u = u[mask]
+                    v = v[mask]
+                    proj_img[v.astype(int), u.astype(int)] = idx + 1
+        except tf2_ros.ExtrapolationException as err:
+            rospy.logwarn(err)
+            return                    
+
         try:
             for pt in self.board_corners:
                 pt.header.stamp = header.stamp
@@ -215,8 +250,10 @@ class ObjectMasker(object):
             #markers[markers_masked == idx] = j
         
         #markers = closeSegments(markers, np.arange(len(d_idxs)))
-
-        display_img = cv2.applyColorMap(markers.astype(np.uint8)*85, cv2.COLORMAP_JET) 
+        combined_img = proj_img + markers
+        display_img = cv2.applyColorMap(combined_img.astype(np.uint8)*42, cv2.COLORMAP_JET) 
+        #display_img = cv2.applyColorMap(proj_img.astype(np.uint8)*85, cv2.COLORMAP_JET) 
+        #display_img = cv2.applyColorMap(markers.astype(np.uint8)*85, cv2.COLORMAP_JET) 
         #display_img = cv2.applyColorMap(markers_masked.astype(np.uint8), cv2.COLORMAP_JET) 
         try:
             display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")

@@ -40,7 +40,7 @@ class ARTagRANSAC(object):
         rospack = rospkg.RosPack()
         self.bundle_file = rospy.get_param('~bundle_file', 
                 os.path.join(rospack.get_path('object_pose_utils'), 'bundles/training_all_mat.xml'))
-        self.max_corres_dist = rospy.get_param('~max_distance', 0.005)
+        self.max_corres_dist = rospy.get_param('~max_distance', 0.01)
         self.tf_broadcaster = tf.TransformBroadcaster()
         
         self.marker_corners, self.marker_centers, self.marker_interior = parseBundleXml(self.bundle_file) 
