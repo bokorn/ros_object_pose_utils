@@ -2,7 +2,7 @@
 	<arg name="config_file" />
 	<arg name="board_frame" default="marker_bundle" />
 
-	<node name="object_masker" pkg="object_pose_utils" type="object_masker.py" ns="object_masker" output="screen">
+	<node name="object_masker" pkg="object_pose_utils" type="tagged_object_masker.py" ns="object_masker" output="screen">
         <param name="board_frame" value="$(arg board_frame)" />
         <param name="config_file" value="$(arg config_file)" />
         <remap from="in_image" to="/image_folder/image" />

@@ -104,5 +104,8 @@ ENV/
 # mypy
 .mypy_cache/
 
+# Local Files
+src/core
+
 # Local Folders
 
