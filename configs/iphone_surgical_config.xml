@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?>
+<objects num_objects="3">
+    <object name="scalpel" >
+        <translation>0.06, 0.15, 0.0</translation>
+        <orientation>0, 0, 0, 1</orientation>
+        <obj_file>/home/bokorn/data/surgical/models/scalpel.obj</obj_file>
+        <pcd_file>/home/bokorn/data/surgical/models/scalpel.pcd</pcd_file>
+    </object>
+
+    <object name="scissor" >
+        <translation>0.199, 0.15, 0.0</translation>
+        <orientation>0, 0, 0, 1</orientation>
+        <obj_file>/home/bokorn/data/surgical/models/scissor.obj</obj_file>
+        <pcd_file>/home/bokorn/data/surgical/models/scissor.pcd</pcd_file>
+    </object>
+
+    <object name="hemostat" >
+        <translation>0.335, 0.14, 0.0</translation>
+        <orientation>0, 0, 0, 1</orientation>
+        <obj_file>/home/bokorn/data/surgical/models/hemostat.obj</obj_file>
+        <pcd_file>/home/bokorn/data/surgical/models/hemostat.pcd</pcd_file>
+    </object>
+</objects>
