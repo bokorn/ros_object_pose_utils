@@ -102,7 +102,7 @@ class ObjectMasker(object):
     def setThreshConst(self, value):
         self.thresh_constant = value
 
-    def getMasks(self, image):
+    def getMasks(self, image, roi_mask = None):
         """ Get objects masks from the image
 
         Args:
@@ -112,21 +112,22 @@ class ObjectMasker(object):
             List of masks, where each mask is an opencv contour
         """
         # create a mask for the ROI
-        board_mask = np.zeros_like(image[:, :, 0])
+        if(roi_mask is None):
+            roi_mask = np.zeros_like(image[:, :, 0])
 
-        if self.image_roi is None:
-            board_mask[:, :] = 1
-        else:
-            board_mask[self.image_roi[1]:self.image_roi[3], self.image_roi[0]:self.image_roi[2]] = 1
+            if self.image_roi is None:
+                roi_mask[:, :] = 1
+            else:
+                roi_mask[self.image_roi[1]:self.image_roi[3], self.image_roi[0]:self.image_roi[2]] = 1
 
-        board_size = board_mask.sum()
+        roi_size = roi_mask.sum()
 
         # Calculate the connected components and mask them with the ROI mask
         all_markers = segmentImage(image, self.thresh_block_size, self.thresh_constant)
-        markers_masked = (all_markers + 1) * board_mask
+        markers_masked = (all_markers + 1) * roi_mask
 
         # Filter out really small and reall large components (noise and background)
-        filtered_idxs, filtered_counts = filterMarkers(markers_masked, board_size / 250, board_size / 3)
+        filtered_idxs, filtered_counts = filterMarkers(markers_masked, roi_size / 250, roi_size / 3)
 
         # Set markers that are outside our filter box to zero
         markers_masked[np.isin(markers_masked, filtered_idxs, invert=True)] = 0
