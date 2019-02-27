@@ -189,9 +189,10 @@ class ObjectMasker(object):
                 category_colors = 255*np.array(sns.color_palette("hls", len(mask_ids)))
         
         _, unique_idx, unique_inv = np.unique(category_names, return_index=True, return_inverse=True)
+        
         for j, u_id in enumerate(unique_inv):
             category_colors[j] = category_colors[unique_idx[u_id]]
-
+        
         if(category_func is None):
             category_func = partial(centerSortX, num_categories = len(category_names))
         
@@ -205,7 +206,8 @@ class ObjectMasker(object):
         
         for m_id, c_id in cat_ids.items():
             category = imantics.Category(category_names[c_id],
-                                         color=imantics.Color(rgb=tuple(category_colors[c_id])))
+                                         color=imantics.Color(rgb=tuple(category_colors[c_id])), 
+                                         id=unique_inv[c_id])
             ann = imantics.Annotation(image = ann_img, category = category, 
                                       mask=anns[m_id]['mask'], bbox=anns[m_id]['bbox'])
             ann_img.add(ann)
