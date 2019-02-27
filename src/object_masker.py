@@ -5,23 +5,17 @@ import numpy as np
 
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
-from multiprocessing import Lock
 
 from sensor_msgs.msg import Image, CameraInfo
-import image_geometry
 import message_filters
 
 from ast import literal_eval
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
 
 import roslib
 roslib.load_manifest("rosparam")
 import rosparam
 
-def isTopLevel(hier):
-    return hier[3]==-1
+import imantics
 
 def filterMarkers(markers, thresh_min, thresh_max):
     idx, counts = np.unique(markers, return_counts=True)
@@ -56,8 +50,6 @@ class ObjectMasker(object):
         self.filter_size = rospy.get_param('~filter_size', default=41)
         self.filter_const = rospy.get_param('~filter_const', default=20)
 	        
-        self.info_mutex = Lock()
-         
         self.bridge = CvBridge()
         
         self.image_sub = message_filters.Subscriber('in_image', Image)
@@ -84,17 +76,19 @@ class ObjectMasker(object):
         all_markers = segmentImage(img, self.filter_size, self.filter_const) 
         markers_masked = (all_markers + 1)*board_mask
 
-        filtered_idxs, filtered_counts = filterMarkers(markers_masked, board_size/500, board_size/3)
+        filtered_idxs, filtered_counts = filterMarkers(markers_masked, board_size/250, board_size/3)
         markers_masked[np.isin(markers_masked, filtered_idxs, invert=True)] = 0
-        img_cnts, contours, hierarchy = cv2.findContours((markers_masked > 0).astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        display_img = img.copy()
-        for cnt, hier in zip(contours, hierarchy[0]):
-            cv2.drawContours(display_img,[cnt],0,(0,0,255), 1)
-            if(isTopLevel(hier)):
-                x,y,w,h = cv2.boundingRect(cnt)
-                cv2.rectangle(display_img,(x,y),(x+w,y+h),(0,255,0), 1)
-
-        #display_img = cv2.applyColorMap(markers_masked.astype(np.uint8), cv2.COLORMAP_JET) 
+        ann_img = imantics.Image(image_array = img)
+        colors = [(255,0,0), (0,255,0), (0,0,255), (0,255,255), (255,0,255), (255,255,0)]
+        for j, idx in enumerate(filtered_idxs):
+            mask = imantics.Mask((markers_masked == idx).astype(np.uint8))
+            ann = imantics.Annotation(image = ann_img, 
+                                      category = imantics.Category('obj_{}'.format(j), 
+                                                                   color=imantics.Color(rgb=colors[j])),
+                                      mask=mask, bbox=imantics.BBox.from_mask(mask))
+            ann_img.add(ann)
+        display_img = ann_img.draw(thickness=1, color_by_category=True)
+        
         try:
             display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
         except CvBridgeError as err:
