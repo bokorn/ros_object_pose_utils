@@ -1,9 +1,9 @@
 <launch>
-    <arg name="image_roi" default="[120, 360, 160, 480]" />
+    <arg name="image_roi" default="[160, 120, 480, 360]" />
     <arg name="filter_size" default="41" />
     <arg name="filter_const" default="20" />
 
-    <node name="object_masker" pkg="object_pose_utils" type="object_masker.py" ns="object_masker" output="screen">
+    <node name="object_masker" pkg="object_pose_utils" type="object_masker_node.py" ns="object_masker" output="screen">
         <param name="image_roi" value="$(arg image_roi)" />
         <param name="filter_size" value="$(arg filter_size)" />
         <param name="filter_const" value="$(arg filter_const)" />

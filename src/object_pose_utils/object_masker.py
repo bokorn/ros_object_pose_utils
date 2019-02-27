@@ -3,9 +3,12 @@
 import rospy
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
+import imantics
 
 import cv2
 from collections import namedtuple
+from functools import partial
 
 
 def isTopLevel(hier):
@@ -57,6 +60,23 @@ def getCMapImage(image, cmap='gray'):
     img_cmap = plt.imshow(image, cmap=cmap)._rgba_cache
     return img_cmap
 
+def centerSortX(image, anns, num_categories = np.inf):
+
+    if(num_categories < len(anns)):
+        anns_prunned = {}
+        areas = [v['bbox'].area for _,v in anns.items()]
+        top_idxs = np.argsort(areas)[-num_categories:]
+        for j, (k, v) in enumerate(anns.items()):
+            if(j in top_idxs):
+                anns_prunned[k] = v
+        anns = anns_prunned
+
+    centers = []
+    keys = []
+    for k,v in anns.items():
+        centers.append(0.5*(v['bbox'].min_point[0] + v['bbox'].max_point[0]))
+ 
+    return dict(zip(np.array(anns.keys())[np.argsort(centers)], range(len(anns))))
 
 class ObjectMasker(object):
     def __init__(self, thresh_block_size, thresh_const, image_roi=None):
@@ -69,7 +89,7 @@ class ObjectMasker(object):
         """
         rospy.init_node("object_masker")
 
-        self.image_roi = None
+        self.image_roi = image_roi
         self.thresh_block_size = thresh_block_size
         self.thresh_constant = thresh_const
 
@@ -102,17 +122,55 @@ class ObjectMasker(object):
         board_size = board_mask.sum()
 
         # Calculate the connected components and mask them with the ROI mask
-        all_markers = segmentImage(image, self.thresh_block_size, self.thresh_block_size)
+        all_markers = segmentImage(image, self.thresh_block_size, self.thresh_constant)
         markers_masked = (all_markers + 1) * board_mask
 
         # Filter out really small and reall large components (noise and background)
-        filtered_idxs, filtereda_counts = filterMarkers(markers_masked, board_size / 500, board_size / 3)
+        filtered_idxs, filtered_counts = filterMarkers(markers_masked, board_size / 250, board_size / 3)
 
         # Set markers that are outside our filter box to zero
         markers_masked[np.isin(markers_masked, filtered_idxs, invert=True)] = 0
+        
+        return markers_masked, filtered_idxs
 
-        # Get the contours from the connected components
-        img_cnts, contours, hierarchy = cv2.findContours((markers_masked > 0).astype(np.uint8), cv2.RETR_TREE,
-                                                         cv2.CHAIN_APPROX_SIMPLE)
+    def getAnnotations(self, image, masks, mask_ids = None, 
+                       category_names = None, category_colors = None, 
+                       category_func = None):
+        ann_img = imantics.Image(image_array = image)
+         
+        if(mask_ids is None):
+            mask_ids = np.unique(masks)
+        
+        if(category_names is None):
+            category_names = ['obj_{}'.format(j) for j in range(len(mask_ids))]
 
-        return contours, hierarchy
+        if(category_colors is None):
+            if(len(mask_ids) < 8):
+                category_colors = 255*np.array(sns.color_palette())
+            else:
+                category_colors = 255*np.array(sns.color_palette("hls", len(mask_ids)))
+        
+        _, unique_idx, unique_inv = np.unique(category_names, return_index=True, return_inverse=True)
+        for j, u_id in enumerate(unique_inv):
+            category_colors[j] = category_colors[unique_idx[u_id]]
+
+        if(category_func is None):
+            category_func = partial(centerSortX, num_categories = len(category_names))
+        
+        anns = {}
+        for m_id in mask_ids:
+            mask = imantics.Mask((masks == m_id).astype(np.uint8))
+            bbox = imantics.BBox.from_mask(mask) 
+            anns[m_id] = {'mask':mask, 'bbox':bbox}
+        
+        cat_ids = category_func(image, anns)
+        
+        for m_id, c_id in cat_ids.items():
+            category = imantics.Category(category_names[c_id],
+                                         color=imantics.Color(rgb=tuple(category_colors[c_id])))
+            ann = imantics.Annotation(image = ann_img, category = category, 
+                                      mask=anns[m_id]['mask'], bbox=anns[m_id]['bbox'])
+            ann_img.add(ann)
+
+        return ann_img
+ 
