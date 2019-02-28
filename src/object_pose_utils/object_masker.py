@@ -1,13 +1,9 @@
-#!/usr/bin/env python
-
-import rospy
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import imantics
 
 import cv2
-from collections import namedtuple
 from functools import partial
 
 
