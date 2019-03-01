@@ -10,15 +10,37 @@ from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo
 import message_filters
 
+from functools import partial
 from object_masker import ObjectMasker
+from feature_classification import FeatureClassifier
 
 roslib.load_manifest("rosparam")
 
+def cropBBox(img, bbox, boarder_width = 10):
+    rows, cols = img.shape[:2]
+    x,y,w,h = bbox
+    y0 = min(max(y - boarder_width, 0), rows)
+    x0 = min(max(x - boarder_width, 0), cols)
+    y1 = min(max(y + h + boarder_width, 0), rows)
+    x1 = min(max(x + w + boarder_width, 0), cols)
+    img_crop = img[y0:y1,x0:x1]
+
+    return img_crop
+
+def classificationFunction(img, anns, classifier):
+    cls_dict = {}
+    for k,v in anns.items():
+        bbox = v['bbox']
+        img_crop = cropBBox(img, bbox.bbox(style = bbox.WIDTH_HEIGHT))
+        cls = classifier.classify(img_crop)[0] 
+        cls_dict[k] = cls-1
+    return cls_dict
 
 class ObjectMaskerNode(object):
     def __init__(self):
         rospy.init_node("object_masker")    
         
+        visual_dict = rospy.get_param('~visual_dict')
         self.image_roi = rospy.get_param('~image_roi',  default=None)
 
         if(self.image_roi is not None):
@@ -35,7 +57,10 @@ class ObjectMaskerNode(object):
         self.image_pub = rospy.Publisher('out_image', Image, queue_size = 1)
 
         self.masker = ObjectMasker(self.filter_size, self.filter_const, self.image_roi)
-
+        self.classifier = FeatureClassifier(visual_dict)
+        self.category_func = partial(classificationFunction, classifier=self.classifier)
+        self.category_names = [v for _, v in sorted(self.classifier.class_names.items())] 
+        
         self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
         self.ts.registerCallback(self.imageCallback)
 
@@ -48,8 +73,10 @@ class ObjectMaskerNode(object):
             return
 
         masks, mask_idxs = self.masker.getMasks(img)
+
         ann_img = self.masker.getAnnotations(img, masks, mask_idxs, 
-                                             category_names = ['scissors', 'scissors', 'scalpel', 'hemostat'])
+                                             category_names = self.category_names,
+                                             category_func = self.category_func)
         
         display_img = ann_img.draw(thickness=1, color_by_category=True)
 

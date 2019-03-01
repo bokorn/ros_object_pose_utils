@@ -28,8 +28,8 @@ def annotateImageFolder(image_path, annotation_path, category_names, image_ext =
         ann_img.file_name = os.path.basename(fn)
         if(save_indv):
             ann_img.save('.'.join(fn.split('.')[:-1] + ['json',]))
-        
-        dataset.add(ann_img)
+        else: 
+           dataset.add(ann_img)
         if(save_disp):
             display_img = ann_img.draw(thickness=1, color_by_category=True)
             cv2.imwrite('.'.join(fn.split('.')[:-1] + ['disp.' + image_ext,]), display_img)
