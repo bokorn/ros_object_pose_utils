@@ -9,12 +9,11 @@ import imantics
 
 from object_pose_utils.object_masker import ObjectMasker
 
-def annotateImageFolder(image_path, annotation_path, category_names, image_ext = 'png',
+def annotateImageFolder(image_path, annotation_path, category_names, image_ext = 'jpg',
                         image_roi = None, filter_size = 41, filter_const = 20,
                         category_func = None, 
                         save_disp = False, save_indv = False): 
     dataset = imantics.Dataset('surgical_tools')
-
     masker = ObjectMasker(filter_size, filter_const, image_roi)
     filenames = glob.glob(image_path + '*.' + image_ext) 
     img_id = 0
@@ -26,16 +25,18 @@ def annotateImageFolder(image_path, annotation_path, category_names, image_ext =
         ann_img = masker.getAnnotations(img, masks, mask_idxs, category_names = category_names)
         ann_img.id = img_id
         ann_img.path = fn
-        ann_img.filename = os.path.basename(fn)
-        img_id += 1
-        dataset.add(ann_img)
+        ann_img.file_name = os.path.basename(fn)
         if(save_indv):
             ann_img.save('.'.join(fn.split('.')[:-1] + ['json',]))
+        
+        dataset.add(ann_img)
         if(save_disp):
             display_img = ann_img.draw(thickness=1, color_by_category=True)
             cv2.imwrite('.'.join(fn.split('.')[:-1] + ['disp.' + image_ext,]), display_img)
-    with open(annotation_path, 'w') as f:                   
-        json.dump(dataset.coco(), f)
+        img_id += 1
+    if(not save_indv):
+        with open(annotation_path, 'w') as f:                   
+            json.dump(dataset.coco(), f)
 
 def main():
     from argparse import ArgumentParser
@@ -43,7 +44,7 @@ def main():
     parser.add_argument('image_folder', type=str)
     parser.add_argument('--category_names', type=str, nargs='+')
     parser.add_argument('--annotation_path', type=str, default=None)
-    parser.add_argument('--image_ext', type=str, default='png')
+    parser.add_argument('--image_ext', type=str, default='jpg')
 
     parser.add_argument('--image_roi', type=int, nargs=4, default=None)
     parser.add_argument('--filter_size', type=int, default=41)
