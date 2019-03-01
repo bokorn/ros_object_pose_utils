@@ -1,5 +1,5 @@
 <launch>
-    <arg name="camera_info_file"/>
+    <arg name="camera_info_file" default="$(find object_pose_utils)/camera_info/iphone_camera_info.yaml"/>
     <arg name="image_folder"/>
     <arg name="image_ext" default="png" />
     <arg name="frame_id" default="/camera" />
