@@ -7,6 +7,28 @@ import cv2
 from functools import partial
 
 
+class AnnotationMapper(object):
+    """
+    Class that will return a mapping of marker ids to annotation ids
+
+    """
+    def sort(self, image, masks, mask_idx, annotations, annotation_idx):
+        """
+
+        Args:
+            image: input image as a BGR ndarray
+            masks: connected component mask
+            mask_idx: list of ids that occur in the mask
+            annotations:
+            annotation_idx: list of ids that occur in the annotations
+
+        Returns:
+            Maping of mask_idx to annotation_idx as a python dictionary
+        """
+        raise NotImplementedError("This method must be implemented")
+
+
+
 def isTopLevel(hier):
     return hier[3] == -1
 
@@ -95,6 +117,7 @@ def centerSortX(image, anns, num_categories = np.inf):
     return dict(zip(np.array(anns.keys())[np.argsort(centers)], range(len(anns))))
 
 
+
 class ObjectMasker(object):
     def __init__(self, thresh_block_size, thresh_const, image_roi=None):
         """
@@ -126,12 +149,13 @@ class ObjectMasker(object):
 
         Args:
             image: input BGR image as an ndarray
+            roi_mask: 2D binary mask as an ndarray
 
         Returns:
             Tuple of a mask "image" and list of corresponding filter IDs.
         """
         # create a mask for the ROI
-        if(roi_mask is None):
+        if roi_mask is None:
             roi_mask = np.zeros_like(image[:, :, 0])
 
             if self.image_roi is None:
@@ -156,7 +180,7 @@ class ObjectMasker(object):
     def getAnnotations(self, image, masks, mask_ids = None, 
                        category_names = None, category_colors = None, 
                        category_func = None):
-        """
+        """ Get annotations from the image
 
         Args:
             image: input BGR image as and ndarray
@@ -167,7 +191,7 @@ class ObjectMasker(object):
             category_func:
 
         Returns:
-
+            Annotated image as an imantics.Image
         """
 
         ann_img = imantics.Image(image_array = image)
