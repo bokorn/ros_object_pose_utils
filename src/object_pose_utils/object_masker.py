@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import imantics
+from sklearn.preprocessing import LabelEncoder
 
 import cv2
 from functools import partial
@@ -12,21 +13,19 @@ class AnnotationMapper(object):
     Class that will return a mapping of marker ids to annotation ids
 
     """
-    def sort(self, image, masks, mask_idx, annotations, annotation_idx):
+    def sort(self, image, masks, categories, annotations):
         """
 
         Args:
             image: input image as a BGR ndarray
             masks: connected component mask
-            mask_idx: list of ids that occur in the mask
-            annotations:
-            annotation_idx: list of ids that occur in the annotations
+            categories: names of the categories as a list of strings
+            annotations: dictionary of mask_ids to imantics.Annotation objects
 
         Returns:
             Maping of mask_idx to annotation_idx as a python dictionary
         """
         raise NotImplementedError("This method must be implemented")
-
 
 
 def isTopLevel(hier):
@@ -79,6 +78,38 @@ def getCMapImage(image, cmap='gray'):
     return img_cmap
 
 
+class CenterSortMapper(AnnotationMapper):
+    """
+    This mapper will label the i
+    """
+
+    def sort(self, image, masks, categories, annotations):
+
+        num_annotations = len(annotations)
+        num_categories = len(categories)
+
+        if num_categories < num_annotations:
+            annotations_prunned = {}
+
+            mask_ids, annotations = annotations.items()
+
+            areas = [annotation.area for annotation in annotations]
+            # take the top num_categories areas
+            top_idx = np.argsort(areas)[-num_categories:]
+
+            for idx in top_idx:
+                annotations_prunned[mask_ids[idx]] = annotations[idx]
+
+            annotations = annotations_prunned
+
+        centers = []
+        keys = []
+        for mask_id, annotation in annotations.items():
+            centers.append(0.5 * (annotation.bbox.min_point[0] + annotation.bbox.max_point[0]))
+
+        return dict(zip(np.array(annotations.keys())[np.argsort(centers)], range(len(annotations))))
+
+
 def centerSortX(image, anns, num_categories = np.inf):
     """
 
@@ -115,7 +146,6 @@ def centerSortX(image, anns, num_categories = np.inf):
         centers.append(0.5*(v['bbox'].min_point[0] + v['bbox'].max_point[0]))
  
     return dict(zip(np.array(anns.keys())[np.argsort(centers)], range(len(anns))))
-
 
 
 class ObjectMasker(object):
@@ -179,7 +209,7 @@ class ObjectMasker(object):
 
     def getAnnotations(self, image, masks, mask_ids = None, 
                        category_names = None, category_colors = None, 
-                       category_func = None):
+                       category_mapper = CenterSortMapper()):
         """ Get annotations from the image
 
         Args:
@@ -187,8 +217,9 @@ class ObjectMasker(object):
             masks: connected component "mask" image from getMasks as an ndarray
             mask_ids: list of component values
             category_names: list of strings
-            category_colors:
-            category_func:
+            category_colors: list of BGR values, same size as "category_names"
+                ex: [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
+            category_mapper: Instance of an AnnotationMapper
 
         Returns:
             Annotated image as an imantics.Image
@@ -203,33 +234,30 @@ class ObjectMasker(object):
             category_names = ['obj_{}'.format(j) for j in range(len(mask_ids))]
 
         if(category_colors is None):
-            if(len(mask_ids) < 8):
-                category_colors = 255*np.array(sns.color_palette())
-            else:
-                category_colors = 255*np.array(sns.color_palette("hls", len(mask_ids)))
-        
-        _, unique_idx, unique_inv = np.unique(category_names, return_index=True, return_inverse=True)
-        
-        for j, u_id in enumerate(unique_inv):
-            category_colors[j] = category_colors[unique_idx[u_id]]
-        
-        if(category_func is None):
-            category_func = partial(centerSortX, num_categories = len(category_names))
-        
-        anns = {}
+            category_colors = (np.array(sns.color_palette(n_colors=(len(category_names)))) * 255).astype(np.uint8).tolist()
+
+        # create a dictionary of label to category name {int: string}
+        le = LabelEncoder()
+
+        labels = le.fit_transform(category_names) + 1
+        label_to_name = dict(zip(labels, category_names))
+        label_to_color = dict(zip(labels, category_colors))
+
+        annotations = {}
         for m_id in mask_ids:
             mask = imantics.Mask((masks == m_id).astype(np.uint8))
-            bbox = imantics.BBox.from_mask(mask) 
-            anns[m_id] = {'mask':mask, 'bbox':bbox}
-        
-        cat_ids = category_func(image, anns)
-        
-        for m_id, c_id in cat_ids.items():
-            category = imantics.Category(category_names[c_id],
-                                         color=imantics.Color(rgb=tuple(category_colors[c_id])), 
-                                         id=unique_inv[c_id]+1)
-            ann = imantics.Annotation(image = ann_img, category = category, 
-                                      mask=anns[m_id]['mask'], bbox=anns[m_id]['bbox'])
+            bbox = imantics.BBox.from_mask(mask)
+            annotation = imantics.Annotation(bbox=bbox, mask=mask)
+            annotations[m_id] = annotation
+
+        category_map = category_mapper.sort(image, masks, category_names, annotations)
+
+        for mask_id, category_id in category_map.items():
+            category = imantics.Category(category_names[category_id],
+                                         color=(category_colors[category_id]),
+                                         id=category_id)
+            ann = imantics.Annotation(image=ann_img, category = category,
+                                      mask=annotations[mask_id].mask, bbox=annotations[mask_id].bbox)
             ann_img.add(ann)
 
         return ann_img
