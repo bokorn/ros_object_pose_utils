@@ -36,6 +36,7 @@ def classificationFunction(img, anns, classifier):
         cls_dict[k] = cls-1
     return cls_dict
 
+
 class ObjectMaskerNode(object):
     def __init__(self):
         rospy.init_node("object_masker")    
@@ -88,18 +89,3 @@ class ObjectMaskerNode(object):
 
         display_msg.header = img_msg.header
         self.image_pub.publish(display_msg)
-
-def main():
-    rospy.init_node("object_masker") 
-    obj_masker = ObjectMaskerNode()
-  
-    try:
-        rospy.spin()
-    except KeyboardInterrupt:
-        rospy.loginfo("Shutting down pose_labeler module")
-
-if __name__=='__main__':
-    try:
-        main()
-    except rospy.ROSInterruptException:
-        pass
