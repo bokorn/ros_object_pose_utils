@@ -17,12 +17,15 @@ class FeatureClassifier(object):
     def featurize(self, img, mask = None):
         kpts, des = self.detector.detectAndCompute(img, mask)
         feature = np.zeros([1,self.k], "float32")
+        success = False
         if(des is not None):
             words, distance = vq(des, self.voc)
             for w in words:
                 feature[0][w] += 1
             feature = self.stdSlr.transform(feature)
-        return feature
+            success = True
+
+        return feature, success
 
     def predict(self, feature):
         cls_id = self.clf.predict(feature)[0]
@@ -31,5 +34,9 @@ class FeatureClassifier(object):
 
 
     def classify(self, img, mask = None):
-        return self.predict(self.featurize(img, mask))
+        features, success = self.featurize(img, mask)
+        if(success):
+            return self.predict(features)
+        else:
+            return -1, 'Featurization Failure'
 

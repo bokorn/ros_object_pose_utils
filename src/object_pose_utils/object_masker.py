@@ -205,12 +205,13 @@ class ObjectMasker(object):
         cat_ids = category_func(image, anns)
         
         for m_id, c_id in cat_ids.items():
-            category = imantics.Category(category_names[c_id],
-                                         color=imantics.Color(rgb=tuple(category_colors[c_id])), 
-                                         id=unique_inv[c_id]+1)
-            ann = imantics.Annotation(image = ann_img, category = category, 
-                                      mask=anns[m_id]['mask'], bbox=anns[m_id]['bbox'])
-            ann_img.add(ann)
+            if(c_id >= 0):
+                category = imantics.Category(category_names[c_id],
+                                             color=imantics.Color(rgb=tuple(category_colors[c_id])), 
+                                             id=unique_inv[c_id]+1)
+                ann = imantics.Annotation(image = ann_img, category = category, 
+                                          mask=anns[m_id]['mask'], bbox=anns[m_id]['bbox'])
+                ann_img.add(ann)
 
         return ann_img
  
