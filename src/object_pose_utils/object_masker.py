@@ -10,11 +10,6 @@ import cv2
 from collections import namedtuple
 from functools import partial
 
-
-def isTopLevel(hier):
-    return hier[3] == -1
-
-
 def filterMarkers(markers, thresh_min, thresh_max):
     """ Filter component indices within a set of bounds
 

@@ -13,29 +13,9 @@ import message_filters
 
 from functools import partial
 from object_masker import ObjectMasker
-from feature_classification import FeatureClassifier
+from feature_classification import FeatureClassifier, classificationFunction, cropBBox
 
 roslib.load_manifest("rosparam")
-
-def cropBBox(img, bbox, boarder_width = 10):
-    rows, cols = img.shape[:2]
-    x0,y0,x1,y1 = bbox
-    y0 = min(max(y0 - boarder_width, 0), rows)
-    x0 = min(max(x0 - boarder_width, 0), cols)
-    y1 = min(max(y1 + boarder_width, 0), rows)
-    x1 = min(max(x1 + boarder_width, 0), cols)
-    img_crop = img[y0:y1,x0:x1]
-
-    return img_crop
-
-def classificationFunction(img, anns, classifier):
-    cls_dict = {}
-    for k,v in anns.items():
-        bbox = v['bbox']
-        img_crop = cropBBox(img, bbox.bbox())
-        cls = classifier.classify(img_crop)[0] 
-        cls_dict[k] = cls-1
-    return cls_dict
 
 class ObjectMaskerNode(object):
     def __init__(self):
