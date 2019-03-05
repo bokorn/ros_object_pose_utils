@@ -63,10 +63,11 @@ class ObjectMaskerNode(object):
         self.category_names = [v for _, v in sorted(self.classifier.class_names.items())] 
         self.obj_idxs = {k:0 for k in self.classifier.class_names.keys()} 
         
-        self.output_folder = rospy.get_param('~output_folder')
-        for cat_name in self.category_names:
-            if not os.path.exists(os.path.join(self.output_folder, cat_name)):
-                os.makedirs(os.path.join(self.output_folder, cat_name))
+        self.output_folder = rospy.get_param('~output_folder', default=None)
+        if(self.output_folder is not None):
+            for cat_name in self.category_names:
+                if not os.path.exists(os.path.join(self.output_folder, cat_name)):
+                    os.makedirs(os.path.join(self.output_folder, cat_name))
 
         self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
         self.ts.registerCallback(self.imageCallback)
@@ -86,17 +87,18 @@ class ObjectMaskerNode(object):
                                              category_func = self.category_func)
         
         display_img = ann_img.draw(thickness=1, color_by_category=True)
-        
-        for ann in ann_img.annotations.values():
-            img_crop = cropBBox(img, ann.mask.bbox())
-            mask_crop = cropBBox(ann.mask.array, ann.mask.bbox())
-            obj_img = np.concatenate([img_crop, np.expand_dims(mask_crop,2)*255], axis=2)
-            cat_id = ann.category.id
-            cv2.imwrite(os.path.join(self.output_folder, 
-                self.classifier.class_names[cat_id], 
-                "{:06}.png".format(self.obj_idxs[cat_id])), 
-                obj_img)
-            self.obj_idxs[cat_id] += 1
+       
+        if(self.output_folder is not None):
+            for ann in ann_img.annotations.values():
+                img_crop = cropBBox(img, ann.mask.bbox())
+                mask_crop = cropBBox(ann.mask.array, ann.mask.bbox())
+                obj_img = np.concatenate([img_crop, np.expand_dims(mask_crop,2)*255], axis=2)
+                cat_id = ann.category.id
+                cv2.imwrite(os.path.join(self.output_folder, 
+                    self.classifier.class_names[cat_id], 
+                    "{:06}.png".format(self.obj_idxs[cat_id])), 
+                    obj_img)
+                self.obj_idxs[cat_id] += 1
 
         try:
             display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
