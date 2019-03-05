@@ -16,11 +16,12 @@ class FeatureClassifier(object):
 
     def featurize(self, img, mask = None):
         kpts, des = self.detector.detectAndCompute(img, mask)
-        words, distance = vq(des, self.voc)
-        feature = np.zeros(self.k, "float32")
-        for w in words:
-            feature[w] += 1
-        feature = self.stdSlr.transform([feature])
+        feature = np.zeros([1,self.k], "float32")
+        if(des is not None):
+            words, distance = vq(des, self.voc)
+            for w in words:
+                feature[0][w] += 1
+            feature = self.stdSlr.transform(feature)
         return feature
 
     def predict(self, feature):
