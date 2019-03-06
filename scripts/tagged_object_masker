@@ -1,0 +1,40 @@
+#!/usr/bin/env python
+import sys
+import rospy
+import argparse
+
+from object_pose_utils.tagged_object_masker import TaggedObjectMasker
+
+DEFAULT_THRESH_BLOCK_SIZE = 30
+DEFAULT_THRESH_CONST = 5
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Tagged Object Masker", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("config_file", type=str, help="Tool configuration")
+    parser.add_argument("-f", "--board_frame", type=str, help="Frame of the board in tf")
+    parser.add_argument("-b", "--thresh-block-size", type=int, help="Block size in pixels for segmentation thresholding")
+    parser.add_argument("-c", "--thresh-const", type=int, help="Constant used for segmentation thresholding")
+
+    args, unknown_args = parser.parse_known_args(sys.argv[1:])
+
+    rospy.init_node("tagged_object_masker")
+
+    board_frame = args.board_frame
+    thresh_block_size = args.thresh_block_size
+    thresh_const = args.thresh_block_size
+
+    if board_frame is None:
+        board_frame = rospy.get_param('~board_frame', 'board_frame')
+
+    if thresh_block_size is None:
+        thresh_block_size = rospy.get_param("~thresh_block_size", DEFAULT_THRESH_BLOCK_SIZE)
+
+    if thresh_const is None:
+        thresh_const = rospy.get_param("~thresh_const", DEFAULT_THRESH_CONST)
+
+    obj_masker = TaggedObjectMasker(args.config_file, board_frame, thresh_block_size, thresh_const)
+
+    try:
+        rospy.spin()
+    except KeyboardInterrupt:
+        rospy.loginfo("Shutting down pose_labeler module")
