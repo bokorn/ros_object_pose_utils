@@ -38,13 +38,12 @@ def classificationFunction(img, anns, classifier):
 
 
 class ObjectMaskerNode(object):
+
     def __init__(self):
-        rospy.init_node("object_masker")    
-        
         visual_dict = rospy.get_param('~visual_dict')
         self.image_roi = rospy.get_param('~image_roi',  default=None)
 
-        if(self.image_roi is not None):
+        if self.image_roi is not None:
             self.image_roi = literal_eval(self.image_roi)
 
         self.filter_size = rospy.get_param('~filter_size', default=41)

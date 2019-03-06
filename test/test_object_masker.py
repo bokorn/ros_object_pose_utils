@@ -23,10 +23,10 @@ class ObjectMaskerTest(unittest.TestCase):
 
         masker = ObjectMasker(31, 5, image_roi=[228, 226, 921, 537])
 
-        categories = ["scalpel", "scissors", "hemostat"]
+        categories = {0: "scalpel", 1: "scissors", 2: "hemostat"}
 
         markers, marker_ids = masker.getMasks(image)
-        annotated_image = masker.getAnnotations(image, markers, marker_ids, category_names=categories)
+        annotated_image = masker.getAnnotations(image, markers, marker_ids, categories=categories)
         mask_image = annotated_image.draw(color_by_category=True)
 
         coco_data = annotated_image.coco(True)
@@ -36,11 +36,6 @@ class ObjectMaskerTest(unittest.TestCase):
 
         cv2.imshow("masked_image", mask_image)
         cv2.waitKey(0)
-
-
-
-
-
 
 
 if __name__ == "__main__":

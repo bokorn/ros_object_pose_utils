@@ -207,41 +207,36 @@ class ObjectMasker(object):
         
         return markers_masked, filtered_idxs
 
-    def getAnnotations(self, image, masks, mask_ids = None, 
-                       category_names = None, category_colors = None, 
-                       category_mapper = CenterSortMapper()):
+    def getAnnotations(self, image, masks, mask_ids=None, categories=None, colors=None, mapper=CenterSortMapper()):
         """ Get annotations from the image
 
         Args:
             image: input BGR image as and ndarray
             masks: connected component "mask" image from getMasks as an ndarray
             mask_ids: list of component values
-            category_names: list of strings
-            category_colors: list of BGR values, same size as "category_names"
-                ex: [[255, 0, 0], [0, 255, 0], [0, 0, 255]]
-            category_mapper: Instance of an AnnotationMapper
+            categories: dictionary of category_id to string
+            category_colors: dictionary of category_id to tuple of BGR values
+                ex: { 0: (255, 0, 0),
+                      1: (0, 255, 0),
+                      2: (0, 0, 255)}
+            mapper: Instance of an AnnotationMapper
 
         Returns:
             Annotated image as an imantics.Image
         """
 
-        ann_img = imantics.Image(image_array = image)
+        ann_img = imantics.Image(image_array=image)
          
-        if(mask_ids is None):
+        if mask_ids is None:
             mask_ids = np.unique(masks)
         
-        if(category_names is None):
+        if categories is None:
             category_names = ['obj_{}'.format(j) for j in range(len(mask_ids))]
+            categories = dict(zip(range(len(mask_ids)), category_names))
 
-        if(category_colors is None):
-            category_colors = (np.array(sns.color_palette(n_colors=(len(category_names)))) * 255).astype(np.uint8).tolist()
-
-        # create a dictionary of label to category name {int: string}
-        le = LabelEncoder()
-
-        labels = le.fit_transform(category_names) + 1
-        label_to_name = dict(zip(labels, category_names))
-        label_to_color = dict(zip(labels, category_colors))
+        if colors is None:
+            category_colors = (np.array(sns.color_palette(n_colors=(len(categories)))) * 255).astype(np.uint8).tolist()
+            colors = dict(zip(sorted(categories.keys()), category_colors))
 
         annotations = {}
         for m_id in mask_ids:
@@ -250,15 +245,14 @@ class ObjectMasker(object):
             annotation = imantics.Annotation(bbox=bbox, mask=mask)
             annotations[m_id] = annotation
 
-        category_map = category_mapper.sort(image, masks, category_names, annotations)
+        category_map = mapper.sort(image, masks, categories, annotations)
 
         for mask_id, category_id in category_map.items():
-            category = imantics.Category(category_names[category_id],
-                                         color=(category_colors[category_id]),
+            category = imantics.Category(categories[category_id],
+                                         color=(colors[category_id]),
                                          id=category_id)
-            ann = imantics.Annotation(image=ann_img, category = category,
+            ann = imantics.Annotation(image=ann_img, category=category,
                                       mask=annotations[mask_id].mask, bbox=annotations[mask_id].bbox)
             ann_img.add(ann)
 
         return ann_img
- 
