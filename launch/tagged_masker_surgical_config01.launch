@@ -3,8 +3,8 @@
 	<arg name="board_frame" default="board_frame" />
     <arg name="thresh_block_size" default="31" />
     <arg name="thresh_const" default="10" />
-    <arg name="camera" default="/r2/head/asus/rgb/image_raw" />
-    <arg name="camera_info" default="/r2/head/asus/rgb/camera_info" />
+    <arg name="camera"       default="/r2/head/asus/rgb/image_raw" />
+    <arg name="camera_info"  default="/r2/head/asus/rgb/camera_info" />
 
     <node name="board_transform" pkg="tf" type="static_transform_publisher" args=".03 .04 0 -1.57 0 0 ar_marker_0 $(arg board_frame) 100"/>
 
