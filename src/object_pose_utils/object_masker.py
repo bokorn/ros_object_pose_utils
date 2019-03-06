@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import imantics
-from sklearn.preprocessing import LabelEncoder
 
 import cv2
 from functools import partial
@@ -256,3 +255,4 @@ class ObjectMasker(object):
             ann_img.add(ann)
 
         return ann_img
+ 
