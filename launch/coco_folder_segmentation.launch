@@ -1,0 +1,41 @@
+<launch>
+    <arg name="visual_dict" />
+    <arg name="image_folder"  />
+    <!--arg name="output_folder" /-->
+
+    <arg name="image_roi" default="[110, 90, 480, 360]" />
+    <arg name="filter_size" default="41" />
+    <arg name="filter_const" default="30" />
+
+    <arg name="camera_info_file" default="$(find object_pose_utils)/camera_info/iphone_camera_info.yaml" />
+    <arg name="image_ext" default="jpg" />
+    <arg name="frame_id" default="/camera" />
+    <arg name="publish_rate" default="5" />
+    <arg name="loop" default="False" />
+
+	<arg name="output_frame" default="/camera" />
+   
+    <arg name="rviz" default="False" />
+
+    <include file="$(find object_pose_utils)/launch/play_image_folder.launch">
+        <arg name="camera_info_file" value="$(arg camera_info_file)" />
+        <arg name="image_folder" value="$(arg image_folder)" />
+        <arg name="image_ext" value="$(arg image_ext)" />
+        <arg name="frame_id" value="$(arg frame_id)" />
+        <arg name="publish_rate" value="$(arg publish_rate)" />
+        <arg name="loop" value="$(arg loop)" />
+    </include>
+ 
+    <node name="object_masker" pkg="object_pose_utils" type="object_masker_node.py" ns="object_masker" output="screen">
+        <param name="visual_dict" value="$(arg visual_dict)" />
+        <param name="image_roi" value="$(arg image_roi)" />
+        <param name="filter_size" value="$(arg filter_size)" />
+        <param name="filter_const" value="$(arg filter_const)" />
+        <!--param name="output_folder" value="$(arg output_folder)" /-->
+        <remap from="in_image" to="/image_folder/image" />
+        <remap from="in_camera_info" to="/image_folder/camera_info" />
+    </node>
+    
+    <node pkg="rviz" type="rviz" name="rviz" output="log" if="$(eval rviz)"/>
+	
+</launch>
