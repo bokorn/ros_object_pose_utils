@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+import argparse
+import sys
+import os
+import json
+
+
+def main(data_folder, output_file, verbose=False):
+
+    filenames = []
+    for root, dirnames, files in os.walk(data_folder):
+        for f in files:
+            if f.endswith("json"):
+                filenames.append(os.path.join(data_folder, f))
+
+    ann_idx = 0
+    annotations = []
+    categories = {}
+    images = []
+
+    for filename in filenames:
+        with open(filename, "r") as f_ptr:
+            if verbose:
+                print "Processing file:{}".format(filename)
+            data = json.load(f_ptr)
+            anns = data["annotations"]
+            categories = data["categories"]
+            imgs = data["images"]
+            for img in imgs:
+                images.append(img)
+            for annotation in anns:
+                annotation["id"] = ann_idx
+                ann_idx += 1
+                annotations.append(annotation)
+            f_ptr.close()
+
+    data_out = {"annotations": annotations,
+                "categories": categories,
+                "images": images,
+                "info": {}
+                }
+
+    with open(output_file, "w") as f_ptr:
+        json.dump(data_out, f_ptr)
+        f_ptr.close()
+    if verbose:
+        print "Wrote data to:{}".format(output_file)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Combine all COCO files in a folder into one COCO file")
+    parser.add_argument("input_folder", type=str, help="Path to the input folder")
+    parser.add_argument("output_file", type=str, help="Output file")
+    parser.add_argument('-v', '--verbose', action='store_true', help="Verbosity flag")
+
+    args, unknown_args = parser.parse_known_args(sys.argv[1:])
+
+    main(args.input_folder, args.output_file, args.verbose)
