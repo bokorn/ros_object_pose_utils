@@ -5,10 +5,12 @@
     <arg name="thresh_const" default="10" />
     <arg name="camera"       default="/r2/head/asus/rgb/image_raw" />
     <arg name="camera_info"  default="/r2/head/asus/rgb/camera_info" />
+    <arg name="output_folder" default="$(env HOME)/surgical_ws/src/data/surgical_config01/coco_train01"/>
 
+    <!-- Static transform between ar_marker_0 to the board frame -->
     <node name="board_transform" pkg="tf" type="static_transform_publisher" args=".03 .04 0 -1.57 0 0 ar_marker_0 $(arg board_frame) 100"/>
 
-    <node name="tagged_object_masker" pkg="object_pose_utils" type="tagged_object_masker" args="$(arg config_file)" output="screen">
+    <node name="tagged_object_masker" pkg="object_pose_utils" type="tagged_object_masker" args="$(arg config_file) -o $(arg output_folder)" output="screen">
         <param name="board_frame" value="$(arg board_frame)"/>
         <param name="thresh_block_size" value="$(arg thresh_block_size)"/>
         <param name="thresh_const" value="$(arg thresh_const)"/>

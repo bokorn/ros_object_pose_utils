@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import sys
+import os
 import rospy
 import argparse
 
@@ -14,6 +15,7 @@ if __name__ == '__main__':
     parser.add_argument("-f", "--board_frame", type=str, help="Frame of the board in tf")
     parser.add_argument("-b", "--thresh-block-size", type=int, help="Block size in pixels for segmentation thresholding")
     parser.add_argument("-c", "--thresh-const", type=int, help="Constant used for segmentation thresholding")
+    parser.add_argument("-o", "--output-folder", type=str, default="./", help="output folder")
 
     args, unknown_args = parser.parse_known_args(sys.argv[1:])
 
@@ -32,7 +34,9 @@ if __name__ == '__main__':
     if thresh_const is None:
         thresh_const = rospy.get_param("~thresh_const", DEFAULT_THRESH_CONST)
 
-    obj_masker = TaggedObjectMasker(args.config_file, board_frame, thresh_block_size, thresh_const)
+    output_folder = os.path.abspath(args.output_folder)
+
+    obj_masker = TaggedObjectMasker(args.config_file, board_frame, thresh_block_size, thresh_const, output_folder)
 
     try:
         rospy.spin()

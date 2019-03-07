@@ -2,6 +2,7 @@
 
 import rospy
 import numpy as np
+import os
 
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
@@ -25,8 +26,37 @@ import roslib
 roslib.load_manifest("rosparam")
 
 from collections import namedtuple
+import re
 
 ImageItem = namedtuple("ImageItem", ["name", "pose", "obj_file", "pcd_file"])
+
+
+# regex to break file into <stub><integer><.extension>
+rg = re.compile("(.*?)(\\d+)(\..*?)$", re.IGNORECASE)
+
+
+def find_largest_index(folder, stub, extension):
+    """ Get the largest file index of a file in a folder
+
+    Args:
+        folder: folder to search
+        stub: "main" part of the filename to match
+        extension: the ".xyz" file extension to match
+
+    Returns:
+        Largest index matched, or -1 if none found
+    """
+    index = -1
+    for root, dirnames, filenames in os.walk(folder):
+        for file in sorted(filenames):
+            m = rg.search(file)
+            if m:
+                st, idx, ext = m.groups()
+                if st == stub and ext == extension:
+                    if idx > index:
+                        index = idx
+        break
+    return index
 
 
 def parseConfigXml(filename):
@@ -96,7 +126,7 @@ class TaggedAnnotationMapper(AnnotationMapper):
 
 
 class TaggedObjectMasker(object):
-    def __init__(self, config_filename, board_frame='board_frame', thresh_block_size=30, thresh_const=5):
+    def __init__(self, config_filename, board_frame='board_frame', thresh_block_size=30, thresh_const=5, output_folder="./output"):
 
         self.objects = parseConfigXml(config_filename)
         self.model = image_geometry.PinholeCameraModel()
@@ -157,6 +187,15 @@ class TaggedObjectMasker(object):
 
         self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
         self.ts.registerCallback(self.imageCallback)
+        self.new_data = False
+
+        self.image_folder = output_folder
+        self.annotation_folder = output_folder
+        self.image_stub = "img_"
+        self.image_ext = "jpg"
+        self.image_id = find_largest_index(self.image_folder, self.image_stub, self.image_ext) + 1
+        self.annotation_ext = 'json'
+
 
     def imageCallback(self, img_msg, info_msg):
 
@@ -239,15 +278,6 @@ class TaggedObjectMasker(object):
         board_size = board_mask[:, :].sum()
         markers, marker_idx = self.object_masker.getMasks(img, roi_mask=board_mask)
 
-        # marker_centers = []
-        # dists = []
-        # for idx in marker_idx:
-        #     M = cv2.moments((markers == idx).astype(np.uint8))
-        #     x_c = M["m10"] / M["m00"]
-        #     y_c = M["m01"] / M["m00"]
-        #     center = np.array([y_c, x_c])
-        #     marker_centers.append(center)
-        #     dists.append(np.linalg.norm(pixel_corners[0, :]-np.array([y_c, x_c])))
 
         mapper = TaggedAnnotationMapper(object_centers_projected)
         annotated_image = self.object_masker.getAnnotations(img,
@@ -258,16 +288,6 @@ class TaggedObjectMasker(object):
 
         mask_image = annotated_image.draw(color_by_category=True)
 
-        # cv2.imshow("masked_image", mask_image)
-        # cv2.waitKey(0)
-
-        # markers_remapped = np.zeros(markers.shape)
-        # for j, idx in enumerate(d_idxs):
-        #     markers_remapped[markers == marker_idx[idx]] = j + 1
-        #
-        #
-        # combined_img = markers_remapped
-        # display_img = cv2.applyColorMap(combined_img.astype(np.uint8)*42, cv2.COLORMAP_JET)
         try:
             display_msg = self.bridge.cv2_to_imgmsg(mask_image.astype(np.uint8), encoding="bgr8")
         except CvBridgeError as err:
@@ -280,7 +300,34 @@ class TaggedObjectMasker(object):
         display_msg_debug = self.bridge.cv2_to_imgmsg(img_debug.astype(np.uint8), encoding="bgr8")
         display_msg_debug.header = img_msg.header
         self.image_pub_debug.publish(display_msg_debug)
+        self.export_annotated_image(img, mask_image, annotated_image)
 
+    def export_annotated_image(self, image, display_image, annotated_image):
+        if not os.path.exists(self.image_folder):
+            rospy.loginfo("creating directory:{}".format(self.image_folder))
+            os.makedirs(self.image_folder)
+        if not os.path.exists(self.annotation_folder):
+            rospy.loginfo("creating directory:{}".format(self.annotation_folder))
+            os.makedirs(self.annotation_folder)
 
-        # cv2.imshow("display_img", display_img)
-        # cv2.waitKey(0)
+        image_id = "{:04d}".format(self.image_id)
+        image_filename = self.image_stub + image_id + '.' + self.image_ext
+        image_path = os.path.join(self.image_folder, image_filename)
+
+        display_filename = self.image_stub + image_id + '.disp.' + self.image_ext
+        display_path = os.path.join(self.image_folder, display_filename)
+
+        annotation_filename = self.image_stub + image_id + '.' + self.annotation_ext
+        annotation_path = os.path.join(self.annotation_folder, annotation_filename)
+
+        annotated_image.id = image_id
+        annotated_image.path = image_path
+        annotated_image.file_name = image_filename
+
+        rospy.loginfo('saving {}'.format(image_path))
+        cv2.imwrite(image_path, image)
+        cv2.imwrite(display_path, display_image)
+
+        annotated_image.save(annotation_path)
+        self.image_id += 1
+
