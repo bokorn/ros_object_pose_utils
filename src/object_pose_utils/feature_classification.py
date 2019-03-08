@@ -9,6 +9,8 @@ from sklearn.externals import joblib
 from scipy.cluster.vq import *
 from sklearn.preprocessing import StandardScaler
 
+from object_masker import AnnotationMapper
+
 def cropBBox(img, bbox, boarder_width = 10):
     rows, cols = img.shape[:2]
     x0,y0,x1,y1 = bbox
@@ -28,6 +30,34 @@ def classificationFunction(img, anns, classifier):
         cls = classifier.classify(img_crop)[0] 
         cls_dict[k] = cls-1
     return cls_dict
+
+
+
+class ClassificationMapper(AnnotationMapper):
+
+    def __init__(self, classifier):
+        super(ClassificationMapper, self).__init__()
+        self.classifier = classifier
+
+    def sort(self, image, masks, categories, annotations):
+        """
+
+        Args:
+            image: input image as a BGR ndarray
+            masks: connected component mask
+            categories: dictionary of category_id to string
+            annotations: dictionary of mask_ids to imantics.Annotation objects
+
+        Returns:
+            Maping of mask_idx to annotation_idx as a python dictionary
+        """
+        cls_dict = {}
+        for mask_id, annotation in annotations.items():
+            img_crop = cropBBox(image, annotation.bbox)
+            cls = self.classifier.classify(img_crop)[0]
+            cls_dict[mask_id] = cls
+        return cls_dict
+
 
 class FeatureClassifier(object):
     def __init__(self, voc_file):

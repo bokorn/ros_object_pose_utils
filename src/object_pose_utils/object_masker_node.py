@@ -12,7 +12,7 @@ import message_filters
 
 from functools import partial
 from object_masker import ObjectMasker
-from feature_classification import FeatureClassifier, classificationFunction, cropBBox
+from feature_classification import FeatureClassifier, ClassificationMapper, cropBBox
 
 roslib.load_manifest("rosparam")
 
@@ -37,8 +37,8 @@ class ObjectMaskerNode(object):
 
         self.masker = ObjectMasker(self.filter_size, self.filter_const, self.image_roi)
         self.classifier = FeatureClassifier(visual_dict)
-        self.category_func = partial(classificationFunction, classifier=self.classifier)
-        self.category_names = [v for _, v in sorted(self.classifier.class_names.items())] 
+        self.mapper = ClassificationMapper(self.classifier)
+        self.categories = self.classifier.class_names
         self.obj_idxs = {k:0 for k in self.classifier.class_names.keys()} 
         
         self.output_folder = rospy.get_param('~output_folder', default=None)
@@ -60,9 +60,9 @@ class ObjectMaskerNode(object):
 
         masks, mask_idxs = self.masker.getMasks(img)
 
-        ann_img = self.masker.getAnnotations(img, masks, mask_idxs, 
-                                             category_names = self.category_names,
-                                             category_func = self.category_func)
+        ann_img = self.masker.getAnnotations(img, masks, mask_idxs,
+                                            categories=self.categories,
+                                            mapper=self.mapper)
         
         display_img = ann_img.draw(thickness=1, color_by_category=True)
        
