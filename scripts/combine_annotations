@@ -28,9 +28,11 @@ def main(data_folder, output_file, verbose=False):
             categories = data["categories"]
             imgs = data["images"]
             for img in imgs:
+                img["id"] = int(img["id"])
                 images.append(img)
             for annotation in anns:
                 annotation["id"] = ann_idx
+                annotation["image_id"] = int(annotation["image_id"])
                 ann_idx += 1
                 annotations.append(annotation)
             f_ptr.close()
