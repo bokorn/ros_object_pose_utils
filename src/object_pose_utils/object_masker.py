@@ -247,12 +247,15 @@ class ObjectMasker(object):
         category_map = mapper.sort(image, masks, categories, annotations)
 
         for mask_id, category_id in category_map.items():
-            category = imantics.Category(categories[category_id],
-                                         color=(colors[category_id]),
-                                         id=category_id)
-            ann = imantics.Annotation(image=ann_img, category=category,
-                                      mask=annotations[mask_id].mask, bbox=annotations[mask_id].bbox)
-            ann_img.add(ann)
+            try:
+                category = imantics.Category(categories[category_id],
+                                             color=(colors[category_id]),
+                                             id=category_id)
+                ann = imantics.Annotation(image=ann_img, category=category,
+                                          mask=annotations[mask_id].mask, bbox=annotations[mask_id].bbox)
+                ann_img.add(ann)
+            except KeyError:
+                pass
 
-        return ann_img
+        return ann_img, category_map
  
