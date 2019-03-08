@@ -8,6 +8,7 @@ import roslib
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo
+from object_pose_msgs.msg import LabeledComponents
 import message_filters
 
 from functools import partial
@@ -34,6 +35,8 @@ class ObjectMaskerNode(object):
         self.image_sub = message_filters.Subscriber('in_image', Image)
         self.info_sub = message_filters.Subscriber('in_camera_info', CameraInfo)
         self.image_pub = rospy.Publisher('out_image', Image, queue_size = 1)
+        self.mask_pub = rospy.Publisher('out_mask', Image, queue_size=1)
+        self.labeled_components_pub = rospy.Publisher('out_components', LabeledComponents, queue_size=1)
 
         self.masker = ObjectMasker(self.filter_size, self.filter_const, self.image_roi)
         self.classifier = FeatureClassifier(visual_dict)
@@ -59,10 +62,17 @@ class ObjectMaskerNode(object):
             return
 
         masks, mask_idxs = self.masker.getMasks(img)
+        ann_img, category_map = self.masker.getAnnotations(img, masks, mask_idxs,categories=self.categories, mapper=self.mapper)
 
-        ann_img = self.masker.getAnnotations(img, masks, mask_idxs,
-                                            categories=self.categories,
-                                            mapper=self.mapper)
+
+        labeled_components_msg = LabeledComponents()
+         
+        mask_img = np.zeros_like(masks, dtype=np.uint8)
+        for mask_id, cat_id in sorted(category_map.items(), key=lambda x: x[1]):
+            cat_id = np.uint8(cat_id)
+            mask_img[masks==mask_id] = cat_id
+            labeled_components_msg.names.append(self.categories[cat_id])
+            labeled_components_msg.labels.append(cat_id)
         
         display_img = ann_img.draw(thickness=1, color_by_category=True)
        
@@ -80,9 +90,15 @@ class ObjectMaskerNode(object):
 
         try:
             display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
+            mask_msg = self.bridge.cv2_to_imgmsg(cv2.normalize(mask_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX), encoding="mono8")
+            labeled_components_msg.image = self.bridge.cv2_to_imgmsg(mask_img)
+
+
         except CvBridgeError as err:
             rospy.logerr(err)
             return
 
         display_msg.header = img_msg.header
         self.image_pub.publish(display_msg)
+        self.mask_pub.publish(mask_msg)
+        self.labeled_components_pub.publish(labeled_components_msg)
