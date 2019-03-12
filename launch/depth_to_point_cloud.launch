@@ -1,0 +1,38 @@
+<!-- Entry point for using OpenNI2 devices -->
+<launch>
+
+    <arg name="manager" default="depth_to_pointcloud"/>
+
+    <arg name="respawn" default="false"
+         doc="Disable bond topics by default"/>
+
+    <arg name="num_worker_threads" default="4"
+         doc="Worker threads for the nodelet manager"/>
+
+
+    <arg name="rgb" default="/r2/head/asus/rgb/image_rect_color" doc="RGB image topic used for registration"/>
+    <!--<arg name="depth" default="/r2/head/asus/depth_registered/hw_registered/image_rect"/>-->
+    <arg name="depth" default="/mask_image/output"/>
+    <arg name="camera_info" default="/r2/head/asus/rgb/camera_info"/>
+    <arg name="output" default="output_cloud" doc="Depth image topic"/>
+
+    <!-- Nodelet manager -->
+    <node pkg="nodelet" type="nodelet" name="$(arg manager)" args="manager" output="screen">
+        <param name="num_worker_threads" value="$(arg num_worker_threads)" />
+    </node>
+
+    <!-- Publish registered XYZRGB point cloud with software registered input -->
+    <node pkg="nodelet" type="nodelet" name="points_xyzrgb_sw_registered"
+          args="load depth_image_proc/point_cloud_xyzrgb $(arg manager)"
+          respawn="$(arg respawn)">
+
+        <!-- input topics -->
+        <remap from="rgb/camera_info"             to="$(arg camera_info)" />
+        <remap from="rgb/image_rect_color"        to="$(arg rgb)" />
+        <remap from="depth_registered/image_rect" to="$(arg depth)" />
+
+        <!-- output topics -->
+        <remap from="depth_registered/points"     to="$(arg output)" />
+    </node>
+
+</launch>
