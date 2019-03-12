@@ -3,8 +3,10 @@
     <arg name="image_roi" default="[160, 120, 480, 360]" />
     <arg name="filter_size" default="31" />
     <arg name="filter_const" default="20" />
+    <arg name="object_select" default="scissor"/>
 
     <node name="object_masker" pkg="object_pose_utils" type="object_masker" ns="object_masker" output="screen">
+        <param name="object_select" value="$(arg object_select)" />
         <param name="visual_dict" value="$(arg visual_dict)" />
         <param name="image_roi" value="$(arg image_roi)" />
         <param name="filter_size" value="$(arg filter_size)" />
