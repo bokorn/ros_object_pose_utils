@@ -9,6 +9,7 @@ import roslib
 import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo
+from std_msgs.msg import String
 from object_pose_msgs.msg import LabeledComponents
 import message_filters
 
@@ -35,6 +36,7 @@ class ObjectMaskerNode(object):
 
         self.image_sub = message_filters.Subscriber('in_image', Image)
         self.info_sub = message_filters.Subscriber('in_camera_info', CameraInfo)
+        self.object_select_sub = rospy.Subscriber('object_select', String, self.object_select_cb)
         self.image_pub = rospy.Publisher('out_image', Image, queue_size = 1)
         self.mask_pub = rospy.Publisher('out_mask', Image, queue_size=1)
         self.labeled_components_pub = rospy.Publisher('out_components', LabeledComponents, queue_size=1)
@@ -56,6 +58,9 @@ class ObjectMaskerNode(object):
         self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
         self.ts.registerCallback(self.imageCallback)
 
+    def object_select_cb(self, msg):
+        self.object_select = msg.data
+
     def imageCallback(self, img_msg, info_msg):
         try:
             img = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
@@ -63,8 +68,6 @@ class ObjectMaskerNode(object):
         except CvBridgeError as err:
             rospy.logerr(err)
             return
-
-        rospy.loginfo("looking for object:{}".format(self.object_select))
 
         masks, mask_idxs = self.masker.getMasks(img)
         ann_img, category_map = self.masker.getAnnotations(img, masks, mask_idxs,categories=self.categories, mapper=self.mapper)
@@ -75,28 +78,32 @@ class ObjectMaskerNode(object):
         name_to_label = {}
         output_object = None
 
-        print "self.object_select = {}".format(self.object_select)
         if self.object_select is not None:
             if self.object_select in self.categories.values():
                 output_object = self.object_select
 
-        print self.categories
+        match_count = 0
         # build the mask image and the labeled components
         for mask_id, cat_id in sorted(category_map.items(), key=lambda x: x[1]):
-            cat_id = np.uint8(cat_id)
+            try:
+                cat_id = np.uint8(cat_id)
 
-            print "cat_id:{} self.categories[cat_id]:{} output_object={}".format(cat_id, self.categories[cat_id], output_object)
-            # if there is a valid output object name, set the mask to 1.  This allows for a single object mask
-            if self.categories[cat_id] == output_object:
-                rospy.loginfo('matched on {} {}'.format(cat_id, output_object))
-                mask_img[masks == mask_id] = 1
-            # else, set the mask to the category id
-            if self.object_select is None:
-                mask_img[masks == mask_id] = cat_id
-            labeled_components_msg.names.append(self.categories[cat_id])
-            labeled_components_msg.labels.append(cat_id)
-            name_to_label[self.categories[cat_id]] = cat_id
-        
+                # if there is a valid output object name, set the mask to 1.  This allows for a single object mask
+                if self.categories[cat_id] == output_object:
+                    mask_img[masks == mask_id] = 1
+                    match_count += 1
+                # else, set the mask to the category id
+                if output_object is None:
+                    mask_img[masks == mask_id] = cat_id
+                labeled_components_msg.names.append(self.categories[cat_id])
+                labeled_components_msg.labels.append(cat_id)
+                name_to_label[self.categories[cat_id]] = cat_id
+            except KeyError:
+                pass
+
+        if match_count > 0:
+            rospy.loginfo('found {} instances of {}'.format(match_count, output_object))
+
         display_img = ann_img.draw(thickness=1, color_by_category=True)
        
         if self.output_folder is not None:
