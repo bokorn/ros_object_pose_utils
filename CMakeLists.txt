@@ -4,6 +4,7 @@ project(object_pose_utils)
 find_package(catkin REQUIRED
     COMPONENTS 
     message_generation 
+    dynamic_reconfigure
     std_msgs 
     tf
     geometry_msgs
@@ -17,9 +18,14 @@ find_package(catkin REQUIRED
 
 catkin_python_setup()
 
+generate_dynamic_reconfigure_options(
+    cfg/ObjectMasker.cfg
+)
+
 catkin_package(
     CATKIN_DEPENDS 
     message_runtime 
+    dynamic_reconfigure
     std_msgs 
     tf
     geometry_msgs

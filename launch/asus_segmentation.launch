@@ -22,6 +22,7 @@
         <param name="image_roi" value="$(arg image_roi)" />
         <param name="filter_size" value="$(arg filter_size)" />
         <param name="filter_const" value="$(arg filter_const)" />
+        <param name="debug" value="false"/>
 
         <remap from="object_select" to="$(arg object_select_topic)"/>
         <remap from="in_image" to="$(arg image_topic)" />

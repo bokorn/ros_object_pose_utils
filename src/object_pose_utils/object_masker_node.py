@@ -16,6 +16,9 @@ import message_filters
 from object_masker import ObjectMasker
 from feature_classification import FeatureClassifier, ClassificationMapper, cropBBox
 
+from dynamic_reconfigure.server import Server
+from object_pose_utils.cfg import ObjectMaskerConfig
+
 roslib.load_manifest("rosparam")
 
 
@@ -41,7 +44,9 @@ class ObjectMaskerNode(object):
         self.mask_pub = rospy.Publisher('out_mask', Image, queue_size=1)
         self.labeled_components_pub = rospy.Publisher('out_components', LabeledComponents, queue_size=1)
 
-        self.masker = ObjectMasker(self.filter_size, self.filter_const, self.image_roi)
+        self.debug = rospy.get_param('~debug', default=False)
+
+        self.masker = ObjectMasker(self.filter_size, self.filter_const, self.image_roi, self.debug)
         self.classifier = FeatureClassifier(visual_dict)
         self.mapper = ClassificationMapper(self.classifier)
         self.categories = self.classifier.class_names
@@ -50,6 +55,7 @@ class ObjectMaskerNode(object):
         self.object_select = rospy.get_param('~object_select', default=None)
         self.output_folder = rospy.get_param('~output_folder', default=None)
 
+
         if self.output_folder is not None:
             for cat_name in self.category_names:
                 if not os.path.exists(os.path.join(self.output_folder, cat_name)):
@@ -57,6 +63,20 @@ class ObjectMaskerNode(object):
 
         self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
         self.ts.registerCallback(self.imageCallback)
+
+        self.dynamic_reconfigure_server = Server(ObjectMaskerConfig, self.dynamic_reconfigure_cb)
+
+    def dynamic_reconfigure_cb(self, config, level):
+
+        filter_size = (config.filter_size // 2) * 2 + 1
+        filter_const = config.filter_const
+
+        self.masker.setThreshBlockSize(filter_size)
+        self.masker.setThreshConst(filter_const)
+        self.masker.setVisualizationDebug(config.debug)
+
+        config.filter_size = filter_size
+        return config
 
     def object_select_cb(self, msg):
         self.object_select = msg.data

@@ -6,7 +6,6 @@ import imantics
 import cv2
 from functools import partial
 
-
 class AnnotationMapper(object):
     """
     Class that will return a mapping of marker ids to annotation ids
@@ -51,25 +50,6 @@ def filterMarkers(markers, thresh_min, thresh_max):
             counts_out.append(c)
     return idx_out, counts_out
 
-
-def segmentImage(img, block_size=11, C=10):
-    """ Segment an image
-
-    Args:
-        img: input BGR-format image an an ndarray
-        block_size: block size for adaptive thresholding
-        C: constant using by adaptive thresholding
-
-    Returns:
-        Output ndarray of connected components.  Same width & height as input image.  Cells with the same value
-        are part of the same component.
-    """
-    img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    img_thr = cv2.adaptiveThreshold(img_bw, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-                                    cv2.THRESH_BINARY_INV, block_size, C)
-
-    _, markers = cv2.connectedComponents(img_thr)
-    return markers
 
 
 def getCMapImage(image, cmap='gray'):
@@ -148,7 +128,7 @@ def centerSortX(image, anns, num_categories = np.inf):
 
 
 class ObjectMasker(object):
-    def __init__(self, thresh_block_size, thresh_const, image_roi=None):
+    def __init__(self, thresh_block_size, thresh_const, image_roi=None, debug=False):
         """
 
         Args:
@@ -159,6 +139,7 @@ class ObjectMasker(object):
         self.image_roi = image_roi
         self.thresh_block_size = thresh_block_size
         self.thresh_constant = thresh_const
+        self.debug = debug
 
     def setImageRoi(self, x1, y1, x2, y2):
         self.image_roi = [x1, y1, x2, y2]
@@ -168,6 +149,9 @@ class ObjectMasker(object):
 
     def setThreshConst(self, value):
         self.thresh_constant = value
+
+    def setVisualizationDebug(self, value):
+        self.debug = value
 
     def getMasks(self, image, roi_mask = None):
         """ Get objects masks from the image
@@ -195,7 +179,7 @@ class ObjectMasker(object):
         roi_size = roi_mask.sum()
 
         # Calculate the connected components and mask them with the ROI mask
-        all_markers = segmentImage(image, self.thresh_block_size, self.thresh_constant)
+        all_markers = self.segmentImage(image, self.thresh_block_size, self.thresh_constant)
         markers_masked = (all_markers + 1) * roi_mask
 
         # Filter out really small and really large components (noise and background)
@@ -259,3 +243,25 @@ class ObjectMasker(object):
 
         return ann_img, category_map
  
+    def segmentImage(self, img, block_size=11, C=10, visualize=False):
+        """ Segment an image
+
+        Args:
+            img: input BGR-format image an an ndarray
+            block_size: block size for adaptive thresholding
+            C: constant using by adaptive thresholding
+
+        Returns:
+            Output ndarray of connected components.  Same width & height as input image.  Cells with the same value
+            are part of the same component.
+        """
+        img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img_thr = cv2.adaptiveThreshold(img_bw, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                        cv2.THRESH_BINARY_INV, block_size, C)
+
+        _, markers = cv2.connectedComponents(img_thr)
+        if self.debug:
+            im = cv2.applyColorMap(markers.astype(np.uint8), cv2.COLORMAP_JET)
+            cv2.imshow("segment image", im)
+            cv2.waitKey(3)
+        return markers
