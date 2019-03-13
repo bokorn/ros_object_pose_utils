@@ -1,18 +1,47 @@
 <launch>
     <arg name="visual_dict" default="$(find object_pose_utils)/scripts/coco_train01_visual_dict.pkl" />
+
+    <arg name="image_topic" default="/r2/head/asus/rgb/image_rect_color"/>
+    <arg name="depth_topic" default="/r2/head/asus/depth/image_rect"/>
+    <arg name="camera_info" default="/r2/head/asus/rgb/camera_info"/>
+    <arg name="image_mask" default="image_mask"/>
+    <arg name="depth_mask" default="depth_mask"/>
+    <arg name="mask_debug" default="false"/>
+    <arg name="object_cloud" default="object_cloud"/>
+
     <arg name="image_roi" default="[160, 120, 480, 360]" />
     <arg name="filter_size" default="31" />
     <arg name="filter_const" default="20" />
     <arg name="object_select" default="scissor"/>
+    <arg name="object_select_topic" default="object_select"/>
 
-    <node name="object_masker" pkg="object_pose_utils" type="object_masker" ns="object_masker" output="screen">
+    <!-- Object masker.  Segments the image, classifies each segment, and creates a 2D mask of the selected object -->
+    <node name="object_masker" pkg="object_pose_utils" type="object_masker" output="screen">
         <param name="object_select" value="$(arg object_select)" />
         <param name="visual_dict" value="$(arg visual_dict)" />
         <param name="image_roi" value="$(arg image_roi)" />
         <param name="filter_size" value="$(arg filter_size)" />
         <param name="filter_const" value="$(arg filter_const)" />
-        <remap from="in_image" to="/r2/head/asus/rgb/image_rect_color" />
-        <remap from="in_camera_info" to="/r2/head/asus/rgb/camera_info" />
+
+        <remap from="object_select" to="$(arg object_select_topic)"/>
+        <remap from="in_image" to="$(arg image_topic)" />
+        <remap from="in_camera_info" to="$(arg camera_info)" />
+        <remap from="out_mask" to="$(arg image_mask)"/>
     </node>
-	
+
+    <!-- Mask the full depth image from the ASUS to make a depth image of just the object -->
+    <node name="mask_image" pkg="object_pose_utils" type="mask_image" 
+          args="$(arg depth_topic) $(arg image_mask) -o $(arg depth_mask)" output="screen"/>
+
+    <!-- Convert the depth image into a point cloud -->
+    <include file="$(find object_pose_utils)/launch/depth_to_point_cloud.launch">
+        <arg name="rgb" value="$(arg image_topic)"/>
+        <arg name="depth" value="$(arg depth_mask)"/>
+        <!-- <arg name="depth" value="/r2/head/asus/depth_registered/hw_registered/image_rect"/> -->
+        <arg name="camera_info" value="$(arg camera_info)"/>
+        <arg name="output" value="$(arg object_cloud)"/>
+    </include>
+    
+
+
 </launch>
