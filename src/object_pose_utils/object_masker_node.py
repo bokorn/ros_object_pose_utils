@@ -146,8 +146,9 @@ class ObjectMaskerNode(object):
             rospy.logerr(err)
             return
 
-        display_msg.header = img_msg.header
-        mask_msg.header = img_msg.header
-        self.image_pub.publish(display_msg)
-        self.mask_pub.publish(mask_msg)
-        self.labeled_components_pub.publish(labeled_components_msg)
+        if match_count > 0:
+            display_msg.header = img_msg.header
+            mask_msg.header = img_msg.header
+            self.image_pub.publish(display_msg)
+            self.mask_pub.publish(mask_msg)
+            self.labeled_components_pub.publish(labeled_components_msg)
