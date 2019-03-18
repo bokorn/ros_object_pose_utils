@@ -37,6 +37,10 @@ class ObjectMaskerNode(object):
         self.info_mutex = Lock()
         self.bridge = CvBridge()
 
+        self.info_msg = None
+        self.img_msg = None
+        self.new_camera_data = False
+
         self.image_sub = message_filters.Subscriber('in_image', Image)
         self.info_sub = message_filters.Subscriber('in_camera_info', CameraInfo)
         self.object_select_sub = rospy.Subscriber('object_select', String, self.object_select_cb)
@@ -61,10 +65,11 @@ class ObjectMaskerNode(object):
                 if not os.path.exists(os.path.join(self.output_folder, cat_name)):
                     os.makedirs(os.path.join(self.output_folder, cat_name))
 
-        self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 100)
+        self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 1)
         self.ts.registerCallback(self.imageCallback)
 
         self.dynamic_reconfigure_server = Server(ObjectMaskerConfig, self.dynamic_reconfigure_cb)
+        self.loop_timer = rospy.Timer(rospy.Duration(0.05), self.process_image)
 
     def dynamic_reconfigure_cb(self, config, level):
 
@@ -82,73 +87,91 @@ class ObjectMaskerNode(object):
         self.object_select = msg.data
 
     def imageCallback(self, img_msg, info_msg):
-        try:
-            img = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
-            header = img_msg.header
-        except CvBridgeError as err:
-            rospy.logerr(err)
-            return
-
-        masks, mask_idxs = self.masker.getMasks(img)
-        ann_img, category_map = self.masker.getAnnotations(img, masks, mask_idxs,categories=self.categories, mapper=self.mapper)
-
-        labeled_components_msg = LabeledComponents()
-         
-        mask_img = np.zeros_like(masks, dtype=np.uint8)
-        name_to_label = {}
-        output_object = None
-
-        if self.object_select is not None:
-            if self.object_select in self.categories.values():
-                output_object = self.object_select
-
-        match_count = 0
-        # build the mask image and the labeled components
-        for mask_id, cat_id in sorted(category_map.items(), key=lambda x: x[1]):
+        if self.info_mutex.acquire(False):
             try:
-                cat_id = np.uint8(cat_id)
+                self.new_camera_data = True
+                self.img_msg = img_msg
+                self.info_msg = info_msg
+            finally:
+                self.info_mutex.release()
 
-                # if there is a valid output object name, set the mask to 1.  This allows for a single object mask
-                if self.categories[cat_id] == output_object:
-                    mask_img[masks == mask_id] = 1
-                    match_count += 1
-                # else, set the mask to the category id
-                if output_object is None:
-                    mask_img[masks == mask_id] = cat_id
-                labeled_components_msg.names.append(self.categories[cat_id])
-                labeled_components_msg.labels.append(cat_id)
-                name_to_label[self.categories[cat_id]] = cat_id
-            except KeyError:
-                pass
+    def process_image(self, event):
 
-        if match_count > 0:
-            rospy.loginfo('found {} instances of {}'.format(match_count, output_object))
-
-        display_img = ann_img.draw(thickness=1, color_by_category=True)
-       
-        if self.output_folder is not None:
-            for ann in ann_img.annotations.values():
-                img_crop = cropBBox(img, ann.mask.bbox())
-                mask_crop = cropBBox(ann.mask.array, ann.mask.bbox())
-                obj_img = np.concatenate([img_crop, np.expand_dims(mask_crop,2)*255], axis=2)
-                cat_id = ann.category.id
-                cv2.imwrite(os.path.join(self.output_folder, 
-                    self.classifier.class_names[cat_id], 
-                    "{:06}.png".format(self.obj_idxs[cat_id])), 
-                    obj_img)
-                self.obj_idxs[cat_id] += 1
-
-        try:
-            display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
-            mask_msg = self.bridge.cv2_to_imgmsg(cv2.normalize(mask_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX), encoding="mono8")
-            labeled_components_msg.image = self.bridge.cv2_to_imgmsg(mask_img)
-        except CvBridgeError as err:
-            rospy.logerr(err)
+        if not self.new_camera_data:
             return
+        
+        with self.info_mutex:
+            self.new_camera_data = False
+            img_msg = self.img_msg
+            info_msg = self.info_msg
+            
+            try:
+                img = self.bridge.imgmsg_to_cv2(img_msg, "bgr8")
+                header = img_msg.header
+            except CvBridgeError as err:
+                rospy.logerr(err)
+                return
 
-        if match_count > 0:
-            display_msg.header = img_msg.header
-            mask_msg.header = img_msg.header
-            self.image_pub.publish(display_msg)
-            self.mask_pub.publish(mask_msg)
-            self.labeled_components_pub.publish(labeled_components_msg)
+            masks, mask_idxs = self.masker.getMasks(img)
+            ann_img, category_map = self.masker.getAnnotations(img, masks, mask_idxs,categories=self.categories, mapper=self.mapper)
+
+            labeled_components_msg = LabeledComponents()
+            
+            mask_img = np.zeros_like(masks, dtype=np.uint8)
+            name_to_label = {}
+            output_object = None
+
+            if self.object_select is not None:
+                if self.object_select in self.categories.values():
+                    output_object = self.object_select
+
+            match_count = 0
+            # build the mask image and the labeled components
+            for mask_id, cat_id in sorted(category_map.items(), key=lambda x: x[1]):
+                try:
+                    cat_id = np.uint8(cat_id)
+
+                    # if there is a valid output object name, set the mask to 1.  This allows for a single object mask
+                    if self.categories[cat_id] == output_object:
+                        mask_img[masks == mask_id] = 1
+                        match_count += 1
+                    # else, set the mask to the category id
+                    if output_object is None:
+                        mask_img[masks == mask_id] = cat_id
+                    labeled_components_msg.names.append(self.categories[cat_id])
+                    labeled_components_msg.labels.append(cat_id)
+                    name_to_label[self.categories[cat_id]] = cat_id
+                except KeyError:
+                    pass
+
+            if match_count > 0:
+                rospy.loginfo('found {} instances of {}'.format(match_count, output_object))
+
+            display_img = ann_img.draw(thickness=1, color_by_category=True)
+        
+            if self.output_folder is not None:
+                for ann in ann_img.annotations.values():
+                    img_crop = cropBBox(img, ann.mask.bbox())
+                    mask_crop = cropBBox(ann.mask.array, ann.mask.bbox())
+                    obj_img = np.concatenate([img_crop, np.expand_dims(mask_crop,2)*255], axis=2)
+                    cat_id = ann.category.id
+                    cv2.imwrite(os.path.join(self.output_folder, 
+                        self.classifier.class_names[cat_id], 
+                        "{:06}.png".format(self.obj_idxs[cat_id])), 
+                        obj_img)
+                    self.obj_idxs[cat_id] += 1
+
+            try:
+                display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
+                mask_msg = self.bridge.cv2_to_imgmsg(cv2.normalize(mask_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX), encoding="mono8")
+                labeled_components_msg.image = self.bridge.cv2_to_imgmsg(mask_img)
+            except CvBridgeError as err:
+                rospy.logerr(err)
+                return
+
+            if match_count > 0:
+                display_msg.header = img_msg.header
+                mask_msg.header = img_msg.header
+                self.image_pub.publish(display_msg)
+                self.mask_pub.publish(mask_msg)
+                self.labeled_components_pub.publish(labeled_components_msg)
