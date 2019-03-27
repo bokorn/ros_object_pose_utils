@@ -63,7 +63,7 @@ class ObjectMaskerNode(object):
                 if not os.path.exists(os.path.join(self.output_folder, cat_name)):
                     os.makedirs(os.path.join(self.output_folder, cat_name))
 
-        self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 1)
+        self.ts = message_filters.TimeSynchronizer([self.image_sub, self.info_sub], queue_size = 5)
         self.ts.registerCallback(self.imageCallback)
 
         self.dynamic_reconfigure_server = Server(ObjectMaskerConfig, self.dynamic_reconfigure_cb)
@@ -164,6 +164,10 @@ class ObjectMaskerNode(object):
             except CvBridgeError as err:
                 rospy.logerr(err)
                 return
+
+            if self.debug:
+                cv2.imshow("display_msg", display_img)
+
 
             if match_count > 0:
                 display_msg.header = img_msg.header
