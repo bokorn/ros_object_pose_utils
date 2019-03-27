@@ -73,12 +73,15 @@ class ObjectMaskerNode(object):
 
         filter_size = (config.filter_size // 2) * 2 + 1
         filter_const = config.filter_const
+        morph_kernel_size = (config.morph_kernel_size // 2) * 2 + 1
 
         self.masker.setThreshBlockSize(filter_size)
         self.masker.setThreshConst(filter_const)
         self.masker.setVisualizationDebug(config.debug)
+        self.masker.setMorphKernelSize(morph_kernel_size)
 
         config.filter_size = filter_size
+        config.morph_kernel_size = morph_kernel_size
         return config
 
     def object_select_cb(self, msg):

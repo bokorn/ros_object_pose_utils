@@ -140,6 +140,7 @@ class ObjectMasker(object):
         self.thresh_block_size = thresh_block_size
         self.thresh_constant = thresh_const
         self.debug = debug
+        self.morph_kernel_size = 0
 
     def setImageRoi(self, x1, y1, x2, y2):
         self.image_roi = [x1, y1, x2, y2]
@@ -149,6 +150,9 @@ class ObjectMasker(object):
 
     def setThreshConst(self, value):
         self.thresh_constant = value
+
+    def setMorphKernelSize(self, value):
+        self.morph_kernel_size = value
 
     def setVisualizationDebug(self, value):
         self.debug = value
@@ -258,6 +262,10 @@ class ObjectMasker(object):
         img_bw = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img_thr = cv2.adaptiveThreshold(img_bw, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                         cv2.THRESH_BINARY_INV, block_size, C)
+
+        if self.morph_kernel_size > 0:
+            kernel = np.ones((self.morph_kernel_size, self.morph_kernel_size),np.uint8)
+            img_thr = cv2.morphologyEx(img_thr, cv2.MORPH_CLOSE, kernel)
 
         _, markers = cv2.connectedComponents(img_thr)
         if self.debug:

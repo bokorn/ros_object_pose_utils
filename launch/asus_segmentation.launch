@@ -12,6 +12,7 @@
     <arg name="image_roi" default="[160, 120, 480, 360]" />
     <arg name="filter_size" default="31" />
     <arg name="filter_const" default="20" />
+    <arg name="morph_kernel_size" default="9" />
     <arg name="object_select" default="scissor"/>
     <arg name="object_select_topic" default="object_select"/>
 
@@ -22,6 +23,7 @@
         <param name="image_roi" value="$(arg image_roi)" />
         <param name="filter_size" value="$(arg filter_size)" />
         <param name="filter_const" value="$(arg filter_const)" />
+        <param name="morph_kernel_size" value="$(arg morph_kernel_size)"/>
         <param name="debug" value="false"/>
 
         <remap from="object_select" to="$(arg object_select_topic)"/>
