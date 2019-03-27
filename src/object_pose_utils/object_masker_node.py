@@ -10,7 +10,6 @@ import rospy
 from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import Image, CameraInfo
 from std_msgs.msg import String
-from object_pose_msgs.msg import LabeledComponents
 import message_filters
 
 from object_masker import ObjectMasker
@@ -46,7 +45,6 @@ class ObjectMaskerNode(object):
         self.object_select_sub = rospy.Subscriber('object_select', String, self.object_select_cb)
         self.image_pub = rospy.Publisher('out_image', Image, queue_size = 1)
         self.mask_pub = rospy.Publisher('out_mask', Image, queue_size=1)
-        self.labeled_components_pub = rospy.Publisher('out_components', LabeledComponents, queue_size=1)
 
         self.debug = rospy.get_param('~debug', default=False)
 
@@ -114,8 +112,6 @@ class ObjectMaskerNode(object):
 
             masks, mask_idxs = self.masker.getMasks(img)
             ann_img, category_map = self.masker.getAnnotations(img, masks, mask_idxs,categories=self.categories, mapper=self.mapper)
-
-            labeled_components_msg = LabeledComponents()
             
             mask_img = np.zeros_like(masks, dtype=np.uint8)
             name_to_label = {}
@@ -126,7 +122,7 @@ class ObjectMaskerNode(object):
                     output_object = self.object_select
 
             match_count = 0
-            # build the mask image and the labeled components
+            # build the mask image
             for mask_id, cat_id in sorted(category_map.items(), key=lambda x: x[1]):
                 try:
                     cat_id = np.uint8(cat_id)
@@ -138,8 +134,6 @@ class ObjectMaskerNode(object):
                     # else, set the mask to the category id
                     if output_object is None:
                         mask_img[masks == mask_id] = cat_id
-                    labeled_components_msg.names.append(self.categories[cat_id])
-                    labeled_components_msg.labels.append(cat_id)
                     name_to_label[self.categories[cat_id]] = cat_id
                 except KeyError:
                     pass
@@ -164,7 +158,6 @@ class ObjectMaskerNode(object):
             try:
                 display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
                 mask_msg = self.bridge.cv2_to_imgmsg(cv2.normalize(mask_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX), encoding="mono8")
-                labeled_components_msg.image = self.bridge.cv2_to_imgmsg(mask_img)
             except CvBridgeError as err:
                 rospy.logerr(err)
                 return
@@ -174,4 +167,3 @@ class ObjectMaskerNode(object):
                 mask_msg.header = img_msg.header
                 self.image_pub.publish(display_msg)
                 self.mask_pub.publish(mask_msg)
-                self.labeled_components_pub.publish(labeled_components_msg)
