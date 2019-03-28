@@ -1,6 +1,6 @@
 <launch>
-    <!-- <arg name="visual_dict" default="$(find object_pose_utils)/scripts/coco_train01_visual_dict.pkl" /> -->
-    <arg name="visual_dict" default="$(find object_pose_utils)/scripts/visual_dict.pkl" />
+    <arg name="visual_dict" default="$(find object_pose_utils)/scripts/coco_train01_visual_dict.pkl" />
+    <!-- <arg name="visual_dict" default="$(find object_pose_utils)/scripts/visual_dict.pkl" /> -->
     <arg name="image_topic" default="/r2/head/asus/rgb/image_rect_color"/>
     <arg name="depth_topic" default="/r2/head/asus/depth/image_rect"/>
     <arg name="camera_info" default="/r2/head/asus/rgb/camera_info"/>
@@ -9,10 +9,11 @@
     <arg name="mask_debug" default="false"/>
     <arg name="object_cloud" default="object_cloud"/>
 
+    <!-- <arg name="image_roi" default="[160, 120, 520, 360]" /> -->
     <arg name="image_roi" default="[160, 120, 520, 360]" />
     <arg name="filter_size" default="25" />
-    <arg name="filter_const" default="31" />
-    <arg name="morph_kernel_size" default="9" />
+    <arg name="filter_const" default="25" />
+    <arg name="morph_kernel_size" default="1" />
     <arg name="object_select" default="scissor"/>
     <arg name="object_select_topic" default="object_select"/>
 
@@ -25,6 +26,7 @@
         <param name="filter_const" value="$(arg filter_const)" />
         <param name="morph_kernel_size" value="$(arg morph_kernel_size)"/>
         <param name="debug" value="true"/>
+        <param name="mapperType" value="center_sort"/>
         <param name="min_cluster_width" value="1"/>
         <param name="max_cluster_width" value="200"/>
         <param name="min_cluster_height" value="1"/>
