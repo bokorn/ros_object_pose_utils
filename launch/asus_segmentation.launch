@@ -25,6 +25,12 @@
         <param name="filter_const" value="$(arg filter_const)" />
         <param name="morph_kernel_size" value="$(arg morph_kernel_size)"/>
         <param name="debug" value="true"/>
+        <param name="min_cluster_width" value="1"/>
+        <param name="max_cluster_width" value="200"/>
+        <param name="min_cluster_height" value="1"/>
+        <param name="max_cluster_height" value="200"/>
+        <param name="min_cluster_area" value="1"/>
+        <param name="max_cluster_area" value="4000"/>
 
         <remap from="object_select" to="$(arg object_select_topic)"/>
         <remap from="in_image" to="$(arg image_topic)" />

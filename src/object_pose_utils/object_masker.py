@@ -141,6 +141,12 @@ class ObjectMasker(object):
         self.thresh_constant = thresh_const
         self.debug = debug
         self.morph_kernel_size = 0
+        self.min_cluster_width = 1
+        self.max_cluster_width = 10000
+        self.min_cluster_height = 1
+        self.max_cluster_height = 10000
+        self.min_cluster_area = self.min_cluster_height * self.min_cluster_width
+        self.max_cluster_area = self.max_cluster_height * self.max_cluster_width
 
     def setImageRoi(self, x1, y1, x2, y2):
         self.image_roi = [x1, y1, x2, y2]
@@ -156,6 +162,19 @@ class ObjectMasker(object):
 
     def setVisualizationDebug(self, value):
         self.debug = value
+
+    def setClusterWidth(self, min_val, max_val):
+        self.min_cluster_width = min_val
+        self.max_cluster_width = max_val
+
+    def setClusterHeight(self, min_val, max_val):
+        self.min_cluster_height = min_val
+        self.max_cluster_height = max_val
+
+    def setClusterArea(self, min_val, max_val):
+        self.min_cluster_area = min_val
+        self.max_cluster_area = max_val
+
 
     def getMasks(self, image, roi_mask = None):
         """ Get objects masks from the image
@@ -267,7 +286,19 @@ class ObjectMasker(object):
             kernel = np.ones((self.morph_kernel_size, self.morph_kernel_size),np.uint8)
             img_thr = cv2.morphologyEx(img_thr, cv2.MORPH_CLOSE, kernel)
 
-        _, markers = cv2.connectedComponents(img_thr)
+        num_labels, markers, stats, centroids = cv2.connectedComponentsWithStats(img_thr)
+
+        for label in range(num_labels):
+            width = stats[label, cv2.CC_STAT_WIDTH]
+            height = stats[label, cv2.CC_STAT_HEIGHT]
+            area = stats[label, cv2.CC_STAT_AREA]
+            if width < self.min_cluster_width or width > self.max_cluster_width:
+                markers[markers == label] = 0
+            elif height < self.min_cluster_height or height > self.max_cluster_height:
+                markers[markers == label] = 0
+            elif area < self.min_cluster_area or area > self.max_cluster_area:
+                markers[markers == label] = 0
+
         if self.debug:
             im = cv2.applyColorMap(markers.astype(np.uint8), cv2.COLORMAP_JET)
             cv2.imshow("segment image", im)
