@@ -10,10 +10,10 @@
     <arg name="object_cloud" default="object_cloud"/>
 
     <!-- <arg name="image_roi" default="[160, 120, 520, 360]" /> -->
-    <arg name="image_roi" default="[160, 120, 520, 360]" />
+    <arg name="image_roi" default="[80, 60, 600, 400]" />
     <arg name="filter_size" default="25" />
-    <arg name="filter_const" default="25" />
-    <arg name="morph_kernel_size" default="1" />
+    <arg name="filter_const" default="35" />
+    <arg name="morph_kernel_size" default="11" />
     <arg name="object_select" default="scissor"/>
     <arg name="object_select_topic" default="object_select"/>
 
