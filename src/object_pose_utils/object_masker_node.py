@@ -80,6 +80,10 @@ class ObjectMaskerNode(object):
         self.masker.setVisualizationDebug(config.debug)
         self.masker.setMorphKernelSize(morph_kernel_size)
 
+        self.masker.setClusterWidth(config.min_cluster_width, config.max_cluster_width)
+        self.masker.setClusterHeight(config.min_cluster_height, config.max_cluster_height)
+        self.masker.setClusterArea(config.min_cluster_area, config.max_cluster_area)
+
         config.filter_size = filter_size
         config.morph_kernel_size = morph_kernel_size
         return config
