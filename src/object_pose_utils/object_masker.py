@@ -50,8 +50,6 @@ def filterMarkers(markers, thresh_min, thresh_max):
             counts_out.append(c)
     return idx_out, counts_out
 
-
-
 def getCMapImage(image, cmap='gray'):
     img_cmap = plt.imshow(image, cmap=cmap)._rgba_cache
     return img_cmap
@@ -128,6 +126,7 @@ def centerSortX(image, anns, num_categories = np.inf):
 
 
 class ObjectMasker(object):
+
     def __init__(self, thresh_block_size, thresh_const, image_roi=None, debug=False):
         """
 

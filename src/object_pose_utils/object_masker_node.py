@@ -57,6 +57,8 @@ class ObjectMaskerNode(object):
         self.object_select = rospy.get_param('~object_select', default=None)
         self.output_folder = rospy.get_param('~output_folder', default=None)
 
+        self.mask_buffer = None
+        self.mask_buffer_depth = 10
 
         if self.output_folder is not None:
             for cat_name in self.category_names:
@@ -162,6 +164,8 @@ class ObjectMaskerNode(object):
                         obj_img)
                     self.obj_idxs[cat_id] += 1
 
+            mask_img = self.filter_output_mask(mask_img)
+
             try:
                 display_msg = self.bridge.cv2_to_imgmsg(display_img.astype(np.uint8), encoding="bgr8")
                 mask_msg = self.bridge.cv2_to_imgmsg(cv2.normalize(mask_img, None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX), encoding="mono8")
@@ -178,3 +182,11 @@ class ObjectMaskerNode(object):
                 mask_msg.header = img_msg.header
                 self.image_pub.publish(display_msg)
                 self.mask_pub.publish(mask_msg)
+
+    def filter_output_mask(self, mask):
+        if self.mask_buffer is None:
+            self.mask_buffer = np.zeros([mask.shape[0],mask.shape[1], self.mask_buffer_depth])
+        self.mask_buffer[:,:,:-1] = self.mask_buffer[:,:,1:]
+        self.mask_buffer[:,:,-1] = mask
+        filter_mask = np.median(self.mask_buffer, axis=2).astype(np.uint8)
+        return filter_mask
