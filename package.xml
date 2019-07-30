@@ -1,5 +1,5 @@
 <package>
-  <name>object_pose_utils</name>
+  <name>ros_object_pose_utils</name>
   <version>0.0.1</version>
   <description>
     Ground truths image datasets with object poses
