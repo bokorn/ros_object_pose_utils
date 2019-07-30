@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(object_pose_utils)
+project(ros_object_pose_utils)
 
 find_package(catkin REQUIRED
     COMPONENTS 
